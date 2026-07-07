@@ -1,0 +1,164 @@
+{
+  "name": "md-live-preview",
+  "displayName": "Markdown Live Preview",
+  "description": "Obsidian-style editable live Markdown preview with custom CSS themes, Mermaid diagrams, and syntax-highlighted code blocks.",
+  "version": "0.0.1",
+  "private": true,
+  "engines": {
+    "vscode": "^1.90.0"
+  },
+  "categories": [
+    "Other"
+  ],
+  "activationEvents": [],
+  "main": "./dist/extension.js",
+  "contributes": {
+    "customEditors": [
+      {
+        "viewType": "mdLivePreview.editor",
+        "displayName": "Markdown Live Preview",
+        "selector": [
+          {
+            "filenamePattern": "*.md"
+          }
+        ],
+        "priority": "option"
+      }
+    ],
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "mdLivePreview",
+          "title": "Markdown Live Preview",
+          "icon": "media/icon.svg"
+        }
+      ]
+    },
+    "views": {
+      "mdLivePreview": [
+        {
+          "id": "mdLivePreview.styleManager",
+          "name": "CSSテーマ",
+          "type": "webview"
+        }
+      ]
+    },
+    "commands": [
+      {
+        "command": "mdLivePreview.openWithLivePreview",
+        "title": "ライブプレビューで開く",
+        "category": "Markdown Live Preview",
+        "icon": "$(open-preview)"
+      },
+      {
+        "command": "mdLivePreview.openWithSource",
+        "title": "ソースを開く",
+        "category": "Markdown Live Preview",
+        "icon": "$(go-to-file)"
+      },
+      {
+        "command": "mdLivePreview.newStyle",
+        "title": "新しいCSSスタイル",
+        "category": "Markdown Live Preview",
+        "icon": "$(add)"
+      }
+    ],
+    "menus": {
+      "editor/title": [
+        {
+          "command": "mdLivePreview.openWithLivePreview",
+          "when": "resourceLangId == markdown && activeCustomEditorId != mdLivePreview.editor",
+          "group": "navigation"
+        },
+        {
+          "command": "mdLivePreview.openWithSource",
+          "when": "activeCustomEditorId == mdLivePreview.editor",
+          "group": "navigation"
+        }
+      ],
+      "view/title": [
+        {
+          "command": "mdLivePreview.newStyle",
+          "when": "view == mdLivePreview.styleManager",
+          "group": "navigation"
+        }
+      ]
+    },
+    "configuration": {
+      "title": "Markdown Live Preview",
+      "properties": {
+        "mdLivePreview.codeTheme": {
+          "type": "string",
+          "enum": [
+            "auto",
+            "dark-plus",
+            "light-plus",
+            "github-dark",
+            "github-light"
+          ],
+          "enumDescriptions": [
+            "VS Code のカラーテーマ（ライト/ダーク）に追従し、VS Code 標準の Dark+/Light+ 配色を使います。",
+            "VS Code 標準のダークテーマ（Dark+）の配色。",
+            "VS Code 標準のライトテーマ（Light+）の配色。",
+            "GitHub ダークの配色。",
+            "GitHub ライトの配色。"
+          ],
+          "default": "auto",
+          "description": "コードブロックのシンタックスハイライトに使うテーマ。\"auto\" は VS Code のカラーテーマ（ライト/ダーク）に追従し、VS Code と同じ Dark+/Light+ 配色になります。"
+        },
+        "mdLivePreview.enabledStyles": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "default": [],
+          "scope": "application",
+          "description": "ライブプレビューに適用する CSS テーマ。サイドバーの「CSSテーマ」から排他的に1つ選択します（グローバル設定）。"
+        },
+        "mdLivePreview.defaultEditor": {
+          "type": "string",
+          "enum": [
+            "prompt",
+            "livePreview",
+            "default"
+          ],
+          "enumDescriptions": [
+            "通常のテキストエディタを既定にし、ライブプレビューはツールバーのボタンから手動で開きます。",
+            ".md ファイルを常に Markdown Live Preview で開きます。",
+            ".md ファイルを常に VS Code の通常のテキストエディタで開きます。"
+          ],
+          "default": "prompt",
+          "description": ".md ファイルの既定エディタを Markdown Live Preview にするかどうかを制御します。"
+        }
+      }
+    }
+  },
+  "scripts": {
+    "compile": "node esbuild.js && tsc --noEmit -p tsconfig.json",
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "watch:esbuild": "node esbuild.js --watch",
+    "watch:tsc": "tsc --noEmit -p tsconfig.json --watch",
+    "vscode:prepublish": "node esbuild.js --production"
+  },
+  "devDependencies": {
+    "@types/node": "^20.14.0",
+    "@types/vscode": "^1.90.0",
+    "esbuild": "^0.24.0",
+    "typescript": "^5.5.0"
+  },
+  "dependencies": {
+    "@codemirror/commands": "^6.7.1",
+    "@codemirror/lang-markdown": "^6.3.1",
+    "@codemirror/language": "^6.10.6",
+    "@codemirror/state": "^6.4.1",
+    "@codemirror/view": "^6.35.0",
+    "@lezer/highlight": "^1.2.1",
+    "@lezer/markdown": "^1.3.2",
+    "@shikijs/core": "^1.24.0",
+    "@shikijs/engine-javascript": "^1.24.0",
+    "@shikijs/langs": "^1.24.0",
+    "@shikijs/themes": "^1.24.0",
+    "mermaid": "^11.4.1",
+    "yaml": "^2.9.0"
+  }
+}

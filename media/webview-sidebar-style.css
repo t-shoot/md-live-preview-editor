@@ -1,0 +1,187 @@
+body {
+	margin: 0;
+	padding: 8px;
+	font-family: var(--vscode-font-family, sans-serif);
+	font-size: var(--vscode-font-size, 13px);
+	color: var(--vscode-foreground);
+}
+
+.mlp-section-title {
+	font-size: 0.75em;
+	font-weight: 700;
+	letter-spacing: 0.06em;
+	text-transform: uppercase;
+	/* Bright, full-strength title color (previously dimmed at 0.75 opacity). */
+	color: var(--vscode-sideBarSectionHeader-foreground, var(--vscode-foreground));
+	opacity: 1;
+	margin: 4px 2px 8px;
+}
+
+.mlp-empty {
+	opacity: 0.7;
+	font-style: italic;
+}
+
+.mlp-hint {
+	margin: 0 0 8px;
+	opacity: 0.7;
+	font-size: 0.9em;
+}
+
+/* ── Theme cards ─────────────────────────────────────────────────────────── */
+.mlp-card-list {
+	display: flex;
+	flex-direction: column;
+	gap: 8px;
+}
+
+.mlp-card {
+	border: 1px solid var(--vscode-panel-border, rgba(127, 127, 127, 0.3));
+	border-radius: 6px;
+	overflow: hidden;
+	cursor: pointer;
+	background: var(--vscode-editorWidget-background, transparent);
+	transition: border-color 0.1s ease, box-shadow 0.1s ease;
+}
+.mlp-card:hover {
+	border-color: var(--vscode-focusBorder, #007fd4);
+}
+.mlp-card-selected {
+	border-color: var(--vscode-focusBorder, #007fd4);
+	box-shadow: 0 0 0 1px var(--vscode-focusBorder, #007fd4);
+}
+
+.mlp-card-head {
+	display: flex;
+	align-items: center;
+	gap: 6px;
+	padding: 6px 8px;
+}
+
+.mlp-radio {
+	flex: none;
+	width: 14px;
+	height: 14px;
+	border-radius: 50%;
+	border: 1.5px solid var(--vscode-descriptionForeground, #888);
+	box-sizing: border-box;
+}
+.mlp-card-selected .mlp-radio {
+	border-color: var(--vscode-focusBorder, #007fd4);
+	background:
+		radial-gradient(circle, var(--vscode-focusBorder, #007fd4) 0 4px, transparent 5px);
+}
+
+.mlp-name {
+	flex: 1;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+	font-weight: 600;
+}
+
+.mlp-badge {
+	flex: none;
+	font-size: 0.72em;
+	font-weight: 700;
+	padding: 1px 6px;
+	border-radius: 999px;
+	color: var(--vscode-badge-foreground, #fff);
+	background: var(--vscode-badge-background, #007fd4);
+}
+
+/* Action buttons: hidden until the card is hovered, to keep the row clean. */
+.mlp-actions {
+	flex: none;
+	display: flex;
+	gap: 1px;
+	opacity: 0;
+	transition: opacity 0.1s ease;
+}
+.mlp-card:hover .mlp-actions,
+.mlp-card:focus-within .mlp-actions {
+	opacity: 1;
+}
+.mlp-action {
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	width: 22px;
+	height: 22px;
+	padding: 0;
+	border: none;
+	border-radius: 4px;
+	background: transparent;
+	color: var(--vscode-icon-foreground, var(--vscode-foreground));
+	opacity: 0.75;
+	cursor: pointer;
+}
+.mlp-action:hover {
+	opacity: 1;
+	background: var(--vscode-toolbar-hoverBackground, rgba(127, 127, 127, 0.2));
+}
+.mlp-action[aria-label="削除"]:hover {
+	color: var(--vscode-errorForeground, #f14c4c);
+}
+
+/* ── Theme preview thumbnail ─────────────────────────────────────────────── */
+.mlp-preview {
+	height: 160px;
+	overflow: hidden;
+	border-top: 1px solid var(--vscode-panel-border, rgba(127, 127, 127, 0.25));
+	/* The card owns the click; the preview is purely illustrative. */
+	pointer-events: none;
+	position: relative;
+	/* Fade the clipped bottom so it reads as a thumbnail of a longer document. */
+	-webkit-mask-image: linear-gradient(to bottom, #000 130px, transparent 100%);
+	mask-image: linear-gradient(to bottom, #000 130px, transparent 100%);
+}
+
+/* ── "+ New style" button ────────────────────────────────────────────────── */
+.mlp-new-style {
+	margin-top: 10px;
+	width: 100%;
+	padding: 5px 8px;
+	background: var(--vscode-button-background);
+	color: var(--vscode-button-foreground);
+	border: none;
+	border-radius: 3px;
+	cursor: pointer;
+	font-size: 1em;
+}
+.mlp-new-style:hover {
+	background: var(--vscode-button-hoverBackground);
+}
+
+/* ── Section separator ───────────────────────────────────────────────────
+   Settings sit on top and the CSS themes below, so the divider goes above the
+   themes section. */
+.mlp-themes {
+	margin-top: 20px;
+	padding-top: 12px;
+	border-top: 1px solid var(--vscode-panel-border, rgba(127, 127, 127, 0.25));
+}
+
+.mlp-field {
+	display: flex;
+	flex-direction: column;
+	gap: 3px;
+	margin-bottom: 10px;
+}
+.mlp-field-label {
+	font-size: 0.9em;
+	opacity: 0.85;
+}
+.mlp-select {
+	width: 100%;
+	padding: 3px 4px;
+	color: var(--vscode-dropdown-foreground, var(--vscode-foreground));
+	background: var(--vscode-dropdown-background, var(--vscode-input-background, #333));
+	border: 1px solid var(--vscode-dropdown-border, var(--vscode-panel-border, rgba(127, 127, 127, 0.4)));
+	border-radius: 3px;
+	cursor: pointer;
+}
+.mlp-select:focus {
+	outline: 1px solid var(--vscode-focusBorder, #007fd4);
+	outline-offset: -1px;
+}

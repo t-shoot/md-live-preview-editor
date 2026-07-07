@@ -1,0 +1,335 @@
+html, body {
+	height: 100%;
+	margin: 0;
+	padding: 0;
+	background: var(--vscode-editor-background);
+	color: var(--vscode-editor-foreground);
+}
+
+#mlp-root {
+	height: 100%;
+}
+
+.cm-editor {
+	height: 100%;
+	/* Append Japanese fallbacks so CJK glyphs render with a proper font when the
+	   editor font lacks them. */
+	font-family: var(--vscode-editor-font-family, monospace), "Hiragino Kaku Gothic ProN", "Hiragino Sans", "Noto Sans JP", "Yu Gothic", Meiryo, sans-serif;
+	font-size: var(--vscode-editor-font-size, 14px);
+}
+
+/* CodeMirror paints a blue focus ring around the whole editor; suppress it. */
+.cm-editor.cm-focused {
+	outline: none;
+}
+
+.cm-scroller {
+	overflow: auto;
+	line-height: 1.7;
+}
+
+/* Full-width, matching VS Code's built-in Markdown preview (no centered "page"
+   column) — content fills the pane edge to edge with just breathing room on
+   the sides. The `.cm-editor` prefix raises specificity above CodeMirror's own
+   injected `.cm-content` rules so the padding wins. `clamp` keeps comfortable
+   side gutters on wide screens without cramping narrow (e.g. side-by-side)
+   layouts. */
+.cm-editor .cm-content {
+	padding: 1.5rem clamp(1rem, 3.5vw, 2.5rem) 40vh;
+	/* Prefer the theme's dedicated cursor color; fall back to the editor's own
+	   foreground (guaranteed to contrast with --vscode-editor-background,
+	   unlike a hardcoded gray which can vanish against a light theme) rather
+	   than a fixed color that only looks right in one of light/dark. */
+	caret-color: var(--vscode-editorCursor-foreground, var(--vscode-editor-foreground, #528bff));
+}
+
+/* Base font size = VS Code's editor font size, and this wins authoritatively.
+   The repeated `.cm-content` class raises specificity to (0,3,0) so it outranks
+   a user CSS theme's `body { font-size: … }` (which the adapter maps to
+   `.cm-editor .cm-content`, only (0,2,0)). That kept a theme's hardcoded px size
+   — e.g. github.css's 16px — from overriding the editor's configured size.
+   Headings, inline code, etc. size themselves in `em`, so they scale off this
+   base and stay proportional to whatever the user set in VS Code. */
+.cm-editor .cm-content.cm-content {
+	font-size: var(--vscode-editor-font-size, 14px);
+}
+
+/* Readable selection highlight for both native and CM-drawn selections. */
+.cm-selectionBackground {
+	background: var(--vscode-editor-selectionBackground, rgba(120, 160, 255, 0.35)) !important;
+}
+.cm-content ::selection {
+	background: var(--vscode-editor-selectionBackground, rgba(120, 160, 255, 0.35));
+}
+
+/* ── Headings ──────────────────────────────────────────────────────────────
+   Applied as line decorations so the size, weight and (for h1/h2) the rule
+   span the full column width rather than just the text. */
+.cm-line.mlp-line-h1,
+.cm-line.mlp-line-h2,
+.cm-line.mlp-line-h3,
+.cm-line.mlp-line-h4,
+.cm-line.mlp-line-h5,
+.cm-line.mlp-line-h6 {
+	font-weight: 700;
+	line-height: 1.3;
+	/* Explicit foreground so headings stay legible on any VS Code theme. A user
+	   CSS theme's `h1 { color }` has equal specificity and comes later, so it
+	   still overrides this. */
+	color: var(--vscode-editor-foreground);
+}
+/* NOTE: never use `margin` on a `.cm-line`. CodeMirror measures every line's
+   box with getBoundingClientRect (border-box), which excludes margin, so a
+   margin creates vertical space its height map never accounts for — and clicks
+   / arrow-key motion then map to the wrong line by the accumulated margin.
+   Express all heading spacing as padding (part of the measured box) instead.
+   The former `margin-bottom` gap is relocated to `padding-top` (breathing room
+   above the heading), which reads just as well and stays measurable. */
+.cm-line.mlp-line-h1 {
+	font-size: 1.9em;
+	padding-top: 0.35em;
+	padding-bottom: 0.15em;
+	border-bottom: 1px solid var(--vscode-panel-border, rgba(127, 127, 127, 0.3));
+}
+.cm-line.mlp-line-h2 {
+	font-size: 1.5em;
+	padding-top: 0.3em;
+	padding-bottom: 0.12em;
+	border-bottom: 1px solid var(--vscode-panel-border, rgba(127, 127, 127, 0.25));
+}
+.cm-line.mlp-line-h3 { font-size: 1.3em; }
+.cm-line.mlp-line-h4 { font-size: 1.15em; }
+.cm-line.mlp-line-h5 { font-size: 1.05em; }
+.cm-line.mlp-line-h6 { font-size: 1em; opacity: 0.85; }
+
+/* ── Inline emphasis ─────────────────────────────────────────────────────── */
+.mlp-strong { font-weight: 700; }
+.mlp-em { font-style: italic; }
+.mlp-strikethrough { text-decoration: line-through; opacity: 0.7; }
+
+.mlp-inline-code {
+	font-family: var(--vscode-editor-font-family, monospace);
+	font-size: 0.92em;
+	background: rgba(127, 127, 127, 0.16);
+	border-radius: 4px;
+	padding: 0.05em 0.35em;
+}
+
+/* ── Fenced code blocks ──────────────────────────────────────────────────────
+   Each code line carries a line decoration. Line decorations sit on the
+   `.cm-line` block, so (unlike a mark) their padding and background never leak
+   onto the inline syntax-token spans, and per-line backgrounds abut into one
+   continuous block. */
+.cm-line.mlp-line-code {
+	background: var(--vscode-textCodeBlock-background, rgba(127, 127, 127, 0.09));
+	font-family: var(--vscode-editor-font-family, monospace);
+	padding-left: 1.1em;
+	padding-right: 1.1em;
+}
+.cm-line.mlp-line-code-first {
+	border-top-left-radius: 6px;
+	border-top-right-radius: 6px;
+	padding-top: 0.5em;
+}
+.cm-line.mlp-line-code-last {
+	border-bottom-left-radius: 6px;
+	border-bottom-right-radius: 6px;
+	padding-bottom: 0.5em;
+}
+
+/* ── Blockquotes ─────────────────────────────────────────────────────────── */
+.cm-line.mlp-line-quote {
+	background: var(--vscode-textBlockQuote-background, rgba(127, 127, 127, 0.05));
+	border-left: 3px solid var(--vscode-textBlockQuote-border, rgba(127, 127, 127, 0.5));
+	padding-left: 1em;
+	color: var(--vscode-descriptionForeground, inherit);
+}
+
+/* ── Lists ───────────────────────────────────────────────────────────────── */
+/* Muted, matching the ordered-list marker below rather than link blue — a
+   marker glyph isn't a link and shouldn't visually imply one. */
+.mlp-bullet {
+	color: var(--vscode-descriptionForeground, #888);
+	font-weight: 700;
+}
+.mlp-list-mark {
+	color: var(--vscode-descriptionForeground, #888);
+}
+
+.mlp-checkbox {
+	display: inline-block;
+	width: 1em;
+	height: 1em;
+	box-sizing: border-box;
+	vertical-align: -0.14em;
+	border: 1.5px solid var(--vscode-checkbox-border, #7a7a7a);
+	border-radius: 3px;
+	cursor: pointer;
+	position: relative;
+}
+.mlp-checkbox-checked {
+	background: var(--vscode-textLink-foreground, #4a9eff);
+	border-color: var(--vscode-textLink-foreground, #4a9eff);
+}
+.mlp-checkbox-checked::after {
+	content: '';
+	position: absolute;
+	left: 0.28em;
+	top: 0.06em;
+	width: 0.24em;
+	height: 0.5em;
+	border: solid #fff;
+	border-width: 0 2px 2px 0;
+	transform: rotate(45deg);
+}
+
+/* ── Rules, links, images ────────────────────────────────────────────────── */
+.mlp-hr {
+	display: inline-block;
+	width: 100%;
+	border-top: 2px solid rgba(127, 127, 127, 0.4);
+	line-height: 0;
+	color: transparent;
+	vertical-align: middle;
+}
+
+.mlp-link {
+	color: var(--vscode-textLink-foreground, #3794ff);
+	cursor: pointer;
+	text-decoration: underline;
+}
+
+.mlp-image {
+	max-width: 100%;
+	border-radius: 4px;
+	margin: 0.3em 0;
+}
+
+/* ── Tables ──────────────────────────────────────────────────────────────── */
+.mlp-table-raw {
+	font-family: var(--vscode-editor-font-family, monospace);
+}
+table.mlp-table {
+	border-collapse: collapse;
+	width: 100%;
+	margin: 0.5em 0;
+}
+table.mlp-table th, table.mlp-table td {
+	border: 1px solid rgba(127, 127, 127, 0.35);
+	padding: 5px 11px;
+	text-align: left;
+}
+table.mlp-table th {
+	background: rgba(127, 127, 127, 0.12);
+	font-weight: 600;
+}
+
+/* ── Frontmatter ─────────────────────────────────────────────────────────
+   Fixed app-chrome styling, like table.mlp-table above — not part of the
+   swappable CSS theme system (cssAdapter.ts), matching how VS Code's own
+   built-in preview keeps its `table.frontmatter` outside a user's
+   markdown.styles theme too. */
+table.mlp-frontmatter {
+	border-collapse: collapse;
+	width: 100%;
+	margin: 0.5em 0;
+}
+table.mlp-frontmatter th, table.mlp-frontmatter td {
+	border: 1px solid rgba(127, 127, 127, 0.35);
+	padding: 5px 11px;
+	text-align: left;
+	vertical-align: top;
+}
+table.mlp-frontmatter th {
+	background: rgba(127, 127, 127, 0.12);
+	font-weight: 600;
+	white-space: nowrap;
+}
+table.mlp-frontmatter td pre {
+	margin: 0;
+	font-family: var(--vscode-editor-font-family, monospace);
+	white-space: pre-wrap;
+}
+
+.mlp-frontmatter-error {
+	margin: 0.5em 0;
+	padding: 8px 13px;
+	border-left: 4px solid var(--vscode-editorError-foreground, #f48771);
+	background: var(--vscode-inputValidation-errorBackground, rgba(244, 135, 113, 0.1));
+	color: var(--vscode-editorError-foreground, #f48771);
+}
+.mlp-frontmatter-error pre {
+	margin: 6px 0 0;
+	white-space: pre-wrap;
+	color: inherit;
+	background: transparent;
+}
+
+/* ── Mermaid ──────────────────────────────────────────────────────────────
+   The container is a fixed viewport that clips its content; the inner canvas
+   is panned/zoomed with a CSS transform. Drag to move, Ctrl/⌘+wheel or the
+   hover toolbar to zoom. */
+.mlp-mermaid {
+	position: relative;
+	overflow: hidden;
+	max-height: 70vh;
+	margin: 0.5em 0;
+	border-radius: 6px;
+	background: var(--vscode-textCodeBlock-background, rgba(127, 127, 127, 0.06));
+	cursor: grab;
+	/* Keep panning gestures from scrolling the page/editor instead. */
+	touch-action: none;
+}
+.mlp-mermaid.mlp-mermaid-grabbing {
+	cursor: grabbing;
+}
+.mlp-mermaid-canvas {
+	transform-origin: 0 0;
+	display: inline-block;
+	/* The rendered SVG must not intercept the drag; the container handles it. */
+	user-select: none;
+}
+.mlp-mermaid-canvas svg {
+	display: block;
+	max-width: none; /* allow zooming beyond the container width */
+}
+
+/* Toolbar: hidden until the diagram is hovered, pinned top-right. */
+.mlp-mermaid-toolbar {
+	position: absolute;
+	top: 6px;
+	right: 6px;
+	display: flex;
+	gap: 4px;
+	opacity: 0;
+	transition: opacity 0.12s ease;
+	z-index: 1;
+}
+.mlp-mermaid:hover .mlp-mermaid-toolbar,
+.mlp-mermaid:focus-within .mlp-mermaid-toolbar {
+	opacity: 1;
+}
+.mlp-mermaid-btn {
+	width: 24px;
+	height: 24px;
+	line-height: 1;
+	font-size: 15px;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	cursor: pointer;
+	color: var(--vscode-button-secondaryForeground, var(--vscode-editor-foreground, #ccc));
+	background: var(--vscode-button-secondaryBackground, rgba(90, 90, 90, 0.85));
+	border: 1px solid var(--vscode-contrastBorder, rgba(127, 127, 127, 0.4));
+	border-radius: 4px;
+	padding: 0;
+}
+.mlp-mermaid-btn:hover {
+	background: var(--vscode-button-secondaryHoverBackground, rgba(110, 110, 110, 0.95));
+}
+.mlp-mermaid-error {
+	color: var(--vscode-errorForeground, #f14c4c);
+	font-family: var(--vscode-editor-font-family, monospace);
+	white-space: pre-wrap;
+	padding: 0.5em;
+}
