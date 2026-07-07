@@ -1,5 +1,5 @@
 {
-  "name": "md-live-preview",
+  "name": "markdown-live-preview-editor",
   "displayName": "Markdown Live Preview",
   "description": "Obsidian-style editable live Markdown preview with custom CSS themes, Mermaid diagrams, and syntax-highlighted code blocks.",
   "version": "0.0.1",
