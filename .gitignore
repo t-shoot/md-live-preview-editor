@@ -1,5 +1,10 @@
 node_modules/
 dist/
+.aidlc-rule-details/
+aidlc-docs/
+CLAUDE.md
 *.vsix
 .claude/
 .playwright-mcp/
+.DS_Store
+Thumbs.db

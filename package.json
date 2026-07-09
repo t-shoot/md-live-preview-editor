@@ -6,14 +6,26 @@
   "publisher": "t-shoot",
   "license": "MIT",
   "icon": "media/icon-128.png",
+  "keywords": [
+    "markdown",
+    "live preview",
+    "wysiwyg",
+    "obsidian",
+    "mermaid",
+    "editor"
+  ],
+  "galleryBanner": {
+    "color": "#1e1e1e",
+    "theme": "dark"
+  },
   "repository": {
     "type": "git",
-    "url": "https://github.com/t-shoot/md-live-preview.git"
+    "url": "https://github.com/t-shoot/md-live-preview-editor.git"
   },
   "bugs": {
-    "url": "https://github.com/t-shoot/md-live-preview/issues"
+    "url": "https://github.com/t-shoot/md-live-preview-editor/issues"
   },
-  "homepage": "https://github.com/t-shoot/md-live-preview#readme",
+  "homepage": "https://github.com/t-shoot/md-live-preview-editor#readme",
   "engines": {
     "vscode": "^1.90.0"
   },
@@ -39,7 +51,7 @@
       "activitybar": [
         {
           "id": "mdLivePreview",
-          "title": "Markdown Live Preview",
+          "title": "Markdown Live Preview Editor",
           "icon": "media/icon.svg"
         }
       ]
@@ -48,7 +60,7 @@
       "mdLivePreview": [
         {
           "id": "mdLivePreview.styleManager",
-          "name": "CSSテーマ",
+          "name": " ",
           "type": "webview"
         }
       ]
