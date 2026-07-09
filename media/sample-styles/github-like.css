@@ -1,0 +1,367 @@
+/*
+ * GitHub Dark (Colorblind) テーマ
+ * github-markdown-css の dark_colorblind 配色を、VS Code の Markdown プレビュー形式
+ * （HTML 要素セレクタ）に変換したもの。GitHub 固有のクラス（.octicon, .pl-*, g-emoji,
+ * .alert, footnote 関連など）はこのアプリで生成されないため除外している。
+ */
+body {
+	color-scheme: dark;
+	margin: 0;
+	font-weight: 400;
+	color: #f0f6fc;
+	background-color: #0d1117;
+	font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Noto Sans", Helvetica, Arial, sans-serif, "Apple Color Emoji", "Segoe UI Emoji";
+	font-size: 16px;
+	line-height: 1.5;
+	word-wrap: break-word;
+}
+
+body > *:first-child {
+	margin-top: 0 !important;
+}
+
+body > *:last-child {
+	margin-bottom: 0 !important;
+}
+
+a {
+	text-decoration: underline;
+	text-underline-offset: .2rem;
+}
+
+details, figcaption, figure {
+	display: block;
+}
+
+summary {
+	display: list-item;
+}
+
+[hidden] {
+	display: none !important;
+}
+
+a {
+	background-color: transparent;
+	color: #4493f8;
+	text-decoration: none;
+}
+
+a:hover {
+	text-decoration: underline;
+}
+
+abbr[title] {
+	border-bottom: none;
+	-webkit-text-decoration: underline dotted;
+	text-decoration: underline dotted;
+}
+
+b, strong {
+	font-weight: 600;
+}
+
+dfn {
+	font-style: italic;
+}
+
+h1 {
+	margin: .67em 0;
+	font-weight: 600;
+	padding-bottom: .3em;
+	font-size: 2em;
+	border-bottom: 1px solid #3d444db3;
+}
+
+mark {
+	background-color: #bb800926;
+	color: #f0f6fc;
+}
+
+small {
+	font-size: 90%;
+}
+
+sub, sup {
+	font-size: 75%;
+	line-height: 0;
+	position: relative;
+	vertical-align: baseline;
+}
+
+sub {
+	bottom: -0.25em;
+}
+
+sup {
+	top: -0.5em;
+}
+
+img {
+	border-style: none;
+	max-width: 100%;
+	box-sizing: content-box;
+}
+
+code, kbd, pre, samp {
+	font-family: monospace;
+	font-size: 1em;
+}
+
+figure {
+	margin: 1em 2.5rem;
+}
+
+hr {
+	box-sizing: content-box;
+	overflow: hidden;
+	background: transparent;
+	border-bottom: 1px solid #3d444db3;
+	height: .25em;
+	padding: 0;
+	margin: 1.5rem 0;
+	background-color: #3d444d;
+	border: 0;
+}
+
+table {
+	border-spacing: 0;
+	border-collapse: collapse;
+	display: block;
+	width: max-content;
+	max-width: 100%;
+	overflow: auto;
+	font-variant: tabular-nums;
+}
+
+td, th {
+	padding: 0;
+}
+
+details summary {
+	cursor: pointer;
+}
+
+kbd {
+	display: inline-block;
+	padding: 0.25rem;
+	font: 11px ui-monospace, SFMono-Regular, SF Mono, Menlo, Consolas, Liberation Mono, monospace;
+	line-height: 10px;
+	color: #f0f6fc;
+	vertical-align: middle;
+	background-color: #151b23;
+	border: solid 1px #3d444d;
+	border-bottom-color: #3d444d;
+	border-radius: 6px;
+	box-shadow: inset 0 -1px 0 #3d444d;
+}
+
+h1, h2, h3, h4, h5, h6 {
+	margin-top: 1.5rem;
+	margin-bottom: 1rem;
+	font-weight: 600;
+	line-height: 1.25;
+}
+
+h2 {
+	font-weight: 600;
+	padding-bottom: .3em;
+	font-size: 1.5em;
+	border-bottom: 1px solid #3d444db3;
+}
+
+h3 {
+	font-weight: 600;
+	font-size: 1.25em;
+}
+
+h4 {
+	font-weight: 600;
+	font-size: 1em;
+}
+
+h5 {
+	font-weight: 600;
+	font-size: .875em;
+}
+
+h6 {
+	font-weight: 600;
+	font-size: .85em;
+	color: #9198a1;
+}
+
+p {
+	margin-top: 0;
+	margin-bottom: 10px;
+}
+
+blockquote {
+	margin: 0;
+	padding: 0 1em;
+	color: #9198a1;
+	border-left: .25em solid #3d444d;
+}
+
+ul, ol {
+	margin-top: 0;
+	margin-bottom: 0;
+	padding-left: 2em;
+}
+
+ol ol, ul ol {
+	list-style-type: lower-roman;
+}
+
+ul ul ol, ul ol ol, ol ul ol, ol ol ol {
+	list-style-type: lower-alpha;
+}
+
+dd {
+	margin-left: 0;
+}
+
+tt, code, samp {
+	font-family: ui-monospace, SFMono-Regular, SF Mono, Menlo, Consolas, Liberation Mono, monospace;
+	font-size: 12px;
+}
+
+pre {
+	margin-top: 0;
+	margin-bottom: 0;
+	font-family: ui-monospace, SFMono-Regular, SF Mono, Menlo, Consolas, Liberation Mono, monospace;
+	font-size: 12px;
+	word-wrap: normal;
+}
+
+p, blockquote, ul, ol, pre {
+	margin-top: 0;
+	margin-bottom: 1rem;
+}
+
+dl, table, details {
+	margin-top: 0;
+	margin-bottom: 1rem;
+}
+
+blockquote > :first-child {
+	margin-top: 0;
+}
+
+blockquote > :last-child {
+	margin-bottom: 0;
+}
+
+li > p {
+	margin-top: 1rem;
+}
+
+li + li {
+	margin-top: .25em;
+}
+
+dl {
+	padding: 0;
+}
+
+dl dt {
+	padding: 0;
+	margin-top: 1rem;
+	font-size: 1em;
+	font-style: italic;
+	font-weight: 600;
+}
+
+dl dd {
+	padding: 0 1rem;
+	margin-bottom: 1rem;
+}
+
+table th {
+	font-weight: 600;
+}
+
+table th, table td {
+	padding: 6px 13px;
+	border: 1px solid #3d444d;
+}
+
+table td > :last-child {
+	margin-bottom: 0;
+}
+
+table tr {
+	background-color: #0d1117;
+	border-top: 1px solid #3d444db3;
+}
+
+table tr:nth-child(2n) {
+	background-color: #151b23;
+}
+
+table img {
+	background-color: transparent;
+}
+
+img[align=right] {
+	padding-left: 20px;
+}
+
+img[align=left] {
+	padding-right: 20px;
+}
+
+code, tt {
+	padding: .2em .4em;
+	margin: 0;
+	font-size: 85%;
+	white-space: break-spaces;
+	background-color: #656c7633;
+	border-radius: 6px;
+}
+
+code br, tt br {
+	display: none;
+}
+
+del code {
+	text-decoration: inherit;
+}
+
+samp {
+	font-size: 85%;
+}
+
+pre code {
+	font-size: 100%;
+}
+
+pre > code {
+	padding: 0;
+	margin: 0;
+	word-break: normal;
+	white-space: pre;
+	background: transparent;
+	border: 0;
+}
+
+pre {
+	padding: 1rem;
+	overflow: auto;
+	font-size: 85%;
+	line-height: 1.45;
+	color: #f0f6fc;
+	background-color: #151b23;
+	border-radius: 6px;
+}
+
+pre code, pre tt {
+	display: inline;
+	padding: 0;
+	margin: 0;
+	overflow: visible;
+	line-height: inherit;
+	word-wrap: normal;
+	background-color: transparent;
+	border: 0;
+}

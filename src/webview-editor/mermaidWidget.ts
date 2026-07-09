@@ -12,7 +12,21 @@ async function loadMermaid(): Promise<typeof import('mermaid')> {
 	}
 	const m = await mermaidModulePromise;
 	const isDark = document.body.classList.contains('vscode-dark') || document.body.classList.contains('vscode-high-contrast');
-	m.default.initialize({ startOnLoad: false, securityLevel: 'strict', theme: isDark ? 'dark' : 'default' });
+	m.default.initialize({
+		startOnLoad: false,
+		securityLevel: 'strict',
+		theme: isDark ? 'dark' : 'default',
+		// Render at native size instead of shrinking to fit the editor's content
+		// width — the widget below provides its own pan/zoom for large diagrams.
+		flowchart: { useMaxWidth: false },
+		sequence: { useMaxWidth: false },
+		class: { useMaxWidth: false },
+		state: { useMaxWidth: false },
+		er: { useMaxWidth: false },
+		gantt: { useMaxWidth: false },
+		journey: { useMaxWidth: false },
+		pie: { useMaxWidth: false },
+	});
 	return m;
 }
 
@@ -32,10 +46,19 @@ export class MermaidWidget extends WidgetType {
 	}
 
 	toDOM(view: EditorView): HTMLElement {
-		// `container` doubles as the pan/zoom viewport: it clips (overflow:hidden)
-		// while `canvas` is moved/scaled via a CSS transform inside it.
+		// `wrap` is the widget's root: it hosts the toolbar as an overlay that
+		// must stay pinned to the corner regardless of scrolling. `container` is
+		// the actual pan/zoom/scroll viewport (native horizontal scrollbar via
+		// `overflow-x: auto`, plus drag-to-pan and Ctrl+wheel zoom); `canvas` is
+		// moved/scaled via a CSS transform inside it. Keeping the toolbar outside
+		// `container` means scrolling `container` can never carry the toolbar
+		// away with it.
+		const wrap = document.createElement('div');
+		wrap.className = 'mlp-mermaid-wrap';
+
 		const container = document.createElement('div');
 		container.className = 'mlp-mermaid';
+		wrap.appendChild(container);
 
 		const canvas = document.createElement('div');
 		canvas.className = 'mlp-mermaid-canvas';
@@ -91,7 +114,7 @@ export class MermaidWidget extends WidgetType {
 		toolbar.appendChild(makeButton('+', '拡大 (Ctrl+ホイールでも可)', () => zoomCenter(1.2)));
 		toolbar.appendChild(makeButton('−', '縮小', () => zoomCenter(1 / 1.2)));
 		toolbar.appendChild(makeButton('↺', '元のサイズに戻す', reset));
-		container.appendChild(toolbar);
+		wrap.appendChild(toolbar);
 
 		// ── Ctrl/Cmd + wheel to zoom (plain wheel keeps scrolling the document) ──
 		container.addEventListener(
@@ -114,6 +137,15 @@ export class MermaidWidget extends WidgetType {
 		let originTy = 0;
 		container.addEventListener('pointerdown', (e) => {
 			if (e.button !== 0) return;
+			// Let the native horizontal scrollbar (`overflow-x: auto`) work
+			// normally: a press landing on the scrollbar track/thumb — below the
+			// actual content box — has `container` itself as the target (the
+			// scrollbar isn't a descendant element). Without this check, a short
+			// scrollbar drag reads as a plain click and drops the cursor into the
+			// diagram's source instead of just scrolling.
+			if (e.target === container && (e.offsetX >= container.clientWidth || e.offsetY >= container.clientHeight)) {
+				return;
+			}
 			dragging = true;
 			moved = false;
 			startX = e.clientX;
@@ -148,7 +180,7 @@ export class MermaidWidget extends WidgetType {
 			if (!moved) {
 				// A plain click: drop the cursor into the diagram's source so it can
 				// be edited (the block reverts to raw text while the cursor is on it).
-				const pos = view.posAtDOM(container);
+				const pos = view.posAtDOM(wrap);
 				view.dispatch({ selection: { anchor: pos }, scrollIntoView: true });
 				view.focus();
 			}
@@ -163,6 +195,11 @@ export class MermaidWidget extends WidgetType {
 				const id = `mlp-mermaid-${renderCounter++}`;
 				const { svg } = await m.default.render(id, code);
 				canvas.innerHTML = svg;
+				// Defensive: some diagram types still emit an inline `max-width` style
+				// even with `useMaxWidth: false` in the config above. An inline style
+				// always wins over the stylesheet's `max-width: none`, so strip it
+				// here to guarantee the diagram renders at its native size.
+				canvas.querySelector('svg')?.style.removeProperty('max-width');
 				reset(); // center once real dimensions are known
 			})
 			.catch((err: unknown) => {
@@ -170,7 +207,7 @@ export class MermaidWidget extends WidgetType {
 				canvas.classList.add('mlp-mermaid-error');
 			});
 
-		return container;
+		return wrap;
 	}
 
 	// Return true so CodeMirror leaves this widget's mouse/pointer/wheel events

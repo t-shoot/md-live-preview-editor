@@ -37,6 +37,29 @@ flowchart TD
     D --> B
 ```
 
+A larger diagram, for checking that Mermaid renders at full size instead of shrinking to fit (drag to pan, Ctrl+wheel or the +/- toolbar to zoom):
+
+```mermaid
+flowchart LR
+    subgraph Inception
+        WD[Workspace Detection] --> RA[Requirements Analysis]
+        RA --> US[User Stories]
+        US --> WP[Workflow Planning]
+    end
+    subgraph Construction
+        FD[Functional Design] --> NFRA[NFR Requirements]
+        NFRA --> NFRD[NFR Design]
+        NFRD --> ID[Infrastructure Design]
+        ID --> CG[Code Generation]
+        CG --> BT[Build and Test]
+    end
+    subgraph Operations
+        OPS[Operations]
+    end
+    WP --> FD
+    BT --> OPS
+```
+
 | Column A | Column B |
 | -------- | -------- |
 | 1        | 2        |

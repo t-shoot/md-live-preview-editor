@@ -1,0 +1,171 @@
+/*
+ * VS Code 標準 Markdown プレビュー テーマ
+ * VS Code 本体の Markdown プレビュー機能（markdown-language-features）が実際に
+ * 使っている CSS（extensions/markdown-language-features/media/markdown.css、
+ * MIT License, Copyright (c) Microsoft Corporation）を元に、このアプリの
+ * HTML 要素セレクタ形式に移植したもの。差分表示・コード行同期ハイライトなど、
+ * このアプリに存在しない機能向けのスタイルは含めていない。
+ *
+ * `--vscode-*` は VS Code がすべての webview に自動で渡す、現在のカラーテーマの
+ * 実際の色を表す CSS 変数。固定のライト/ダーク2色ではなく、ユーザーが実際に
+ * 使っているカラーテーマにそのまま追従する。
+ */
+body {
+	font-family: var(--vscode-editor-font-family, -apple-system, BlinkMacSystemFont, "Segoe WPC", "Segoe UI", system-ui, "Ubuntu", "Droid Sans", sans-serif);
+	font-size: 14px;
+	line-height: 22px;
+	color: var(--vscode-editor-foreground, #333333);
+	background-color: var(--vscode-editor-background, #ffffff);
+	word-wrap: break-word;
+}
+
+h1, h2, h3, h4, h5, h6 {
+	font-weight: 600;
+	margin-top: 24px;
+	margin-bottom: 16px;
+	line-height: 1.25;
+}
+
+h1 {
+	font-size: 2em;
+	margin-top: 0;
+	padding-bottom: 0.3em;
+	border-bottom-width: 1px;
+	border-bottom-style: solid;
+	border-bottom-color: rgba(0, 0, 0, 0.18);
+}
+
+h2 {
+	font-size: 1.5em;
+	padding-bottom: 0.3em;
+	border-bottom-width: 1px;
+	border-bottom-style: solid;
+	border-bottom-color: rgba(0, 0, 0, 0.18);
+}
+
+h3 {
+	font-size: 1.25em;
+}
+
+h4 {
+	font-size: 1em;
+}
+
+h5 {
+	font-size: 0.875em;
+}
+
+h6 {
+	font-size: 0.85em;
+}
+
+sub, sup {
+	line-height: 0;
+}
+
+img {
+	max-width: 100%;
+}
+
+a {
+	color: var(--vscode-textLink-foreground, #006ab1);
+	text-decoration: none;
+}
+
+a:hover {
+	color: var(--vscode-textLink-activeForeground, #006ab1);
+	text-decoration: underline;
+}
+
+p {
+	margin-top: 0;
+	margin-bottom: 16px;
+}
+
+li p {
+	margin-bottom: 0.7em;
+}
+
+ul, ol {
+	margin-top: 0;
+	margin-bottom: 0.7em;
+}
+
+hr {
+	border: 0;
+	height: 1px;
+	border-bottom: 1px solid rgba(0, 0, 0, 0.18);
+}
+
+table {
+	border-collapse: collapse;
+	margin-bottom: 0.7em;
+}
+
+th {
+	text-align: left;
+	border-bottom: 1px solid rgba(0, 0, 0, 0.69);
+}
+
+th, td {
+	padding: 5px 10px;
+}
+
+table > tbody > tr + tr > td {
+	border-top: 1px solid rgba(0, 0, 0, 0.18);
+}
+
+blockquote {
+	margin: 0;
+	padding: 0px 16px 0 10px;
+	border-left-width: 5px;
+	border-left-style: solid;
+	border-left-color: var(--vscode-textBlockQuote-border, rgba(0, 122, 204, 0.5));
+	background: var(--vscode-textBlockQuote-background, rgba(127, 127, 127, 0.1));
+	border-radius: 2px;
+}
+
+code {
+	font-family: var(--vscode-editor-font-family, "SF Mono", Monaco, Menlo, Consolas, "Ubuntu Mono", "Liberation Mono", "DejaVu Sans Mono", "Courier New", monospace);
+	font-size: 1em;
+	line-height: 1.357em;
+	color: var(--vscode-textPreformat-foreground, #a31515);
+}
+
+pre {
+	background-color: var(--vscode-textCodeBlock-background, #f3f3f3);
+	border: 1px solid var(--vscode-widget-border, rgba(0, 0, 0, 0.18));
+	padding: 16px;
+	border-radius: 3px;
+	overflow: auto;
+}
+
+pre code {
+	display: inline-block;
+	color: var(--vscode-editor-foreground, #333333);
+	tab-size: 4;
+	background: none;
+	padding: 0;
+	margin: 0;
+	overflow: visible;
+	white-space: pre;
+	word-wrap: normal;
+	border: 0;
+}
+
+/* VS Code がダークテーマのときはダーク配色にする */
+body.vscode-dark h1,
+body.vscode-dark h2,
+body.vscode-dark hr,
+body.vscode-dark table > tbody > tr + tr > td {
+	border-color: rgba(255, 255, 255, 0.18);
+}
+
+body.vscode-dark th {
+	border-color: rgba(255, 255, 255, 0.69);
+}
+
+/* コントラスト強調テーマ用の上書き（VS Code本体の markdown.css に準拠） */
+body.vscode-high-contrast h1 {
+	border-color: rgb(0, 0, 0);
+}

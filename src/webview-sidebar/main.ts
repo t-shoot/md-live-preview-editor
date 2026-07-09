@@ -134,10 +134,12 @@ function buildCard(style: StyleEntry, themeKind: ThemeKind): HTMLElement {
 	card.appendChild(head);
 	card.appendChild(buildPreview(style, themeKind));
 
-	// Clicking the card applies this theme; clicking the already-applied one clears
-	// the selection (exclusive selection is enforced by the host).
+	// Clicking a card applies this theme; clicking the already-applied one is a
+	// no-op (there must always be exactly one theme active, so selection can't be
+	// cleared this way — exclusive selection among the others is enforced by the host).
 	card.addEventListener('click', () => {
-		post({ type: 'toggle', id: style.id, enabled: !style.enabled });
+		if (style.enabled) return;
+		post({ type: 'toggle', id: style.id, enabled: true });
 	});
 
 	return card;
@@ -226,7 +228,7 @@ function render(styles: StyleEntry[], settings: SidebarSettings, themeKind: Them
 	} else {
 		const hint = document.createElement('p');
 		hint.className = 'mlp-hint';
-		hint.textContent = 'カードをクリックして適用（1つだけ・もう一度で解除）。';
+		hint.textContent = 'カードをクリックして適用（1つだけ選べます）。';
 		themesSection.appendChild(hint);
 
 		const list = document.createElement('div');

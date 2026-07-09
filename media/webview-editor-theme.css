@@ -41,6 +41,14 @@ html, body {
 	   unlike a hardcoded gray which can vanish against a light theme) rather
 	   than a fixed color that only looks right in one of light/dark. */
 	caret-color: var(--vscode-editorCursor-foreground, var(--vscode-editor-foreground, #528bff));
+	/* `.cm-content` is a flex item of `.cm-scroller`, so its default automatic
+	   minimum width equals its widest child's intrinsic content width (CSS
+	   Flexbox § automatic minimum size) — a single wide block (e.g. a large
+	   Mermaid diagram) would otherwise stretch the *whole* content column, drag-
+	   scrolling every other line sideways with it. `min-width: 0` lets it shrink
+	   to the scroller's actual width instead, so only the oversized block's own
+	   `overflow-x: auto` (see `.mlp-mermaid`) scrolls — not the whole document. */
+	min-width: 0;
 }
 
 /* Base font size = VS Code's editor font size, and this wins authoritatively.
@@ -266,14 +274,26 @@ table.mlp-frontmatter td pre {
 }
 
 /* ── Mermaid ──────────────────────────────────────────────────────────────
-   The container is a fixed viewport that clips its content; the inner canvas
-   is panned/zoomed with a CSS transform. Drag to move, Ctrl/⌘+wheel or the
-   hover toolbar to zoom. */
-.mlp-mermaid {
+   `.mlp-mermaid-wrap` is the block-level box in the document flow and the
+   positioning root for the toolbar overlay. `.mlp-mermaid` inside it is the
+   actual scroll/pan/zoom viewport: a native horizontal scrollbar
+   (`overflow-x: auto`) for oversized diagrams, plus drag-to-pan and
+   Ctrl/⌘+wheel zoom on top via a CSS transform on `.mlp-mermaid-canvas`.
+   `max-width: 100%` keeps an oversized diagram from growing past this box
+   (see also the `.cm-content { min-width: 0 }` fix, without which this box's
+   own content could still stretch its ancestor). The toolbar lives outside
+   `.mlp-mermaid` (a sibling under the wrap, not a descendant) specifically so
+   scrolling the diagram can never carry it out of view along with the
+   content. */
+.mlp-mermaid-wrap {
 	position: relative;
-	overflow: hidden;
-	max-height: 70vh;
 	margin: 0.5em 0;
+}
+.mlp-mermaid {
+	max-width: 100%;
+	overflow-x: auto;
+	overflow-y: hidden;
+	max-height: 70vh;
 	border-radius: 6px;
 	background: var(--vscode-textCodeBlock-background, rgba(127, 127, 127, 0.06));
 	cursor: grab;
@@ -294,7 +314,8 @@ table.mlp-frontmatter td pre {
 	max-width: none; /* allow zooming beyond the container width */
 }
 
-/* Toolbar: hidden until the diagram is hovered, pinned top-right. */
+/* Toolbar: hidden until the diagram is hovered, pinned top-right — positioned
+   against the wrap (not `.mlp-mermaid`) so scrolling never moves it. */
 .mlp-mermaid-toolbar {
 	position: absolute;
 	top: 6px;
@@ -305,8 +326,8 @@ table.mlp-frontmatter td pre {
 	transition: opacity 0.12s ease;
 	z-index: 1;
 }
-.mlp-mermaid:hover .mlp-mermaid-toolbar,
-.mlp-mermaid:focus-within .mlp-mermaid-toolbar {
+.mlp-mermaid-wrap:hover .mlp-mermaid-toolbar,
+.mlp-mermaid-wrap:focus-within .mlp-mermaid-toolbar {
 	opacity: 1;
 }
 .mlp-mermaid-btn {

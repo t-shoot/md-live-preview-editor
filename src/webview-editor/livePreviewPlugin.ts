@@ -380,10 +380,30 @@ function buildDecorations(view: EditorView): DecorationSet {
 							// Rendered as a diagram by blockDecorationsField; skip entirely.
 							return false;
 						}
-						addLineRange(node.from, node.to, (_n, first, last) => {
+						const firstLineNum = doc.lineAt(node.from).number;
+						const lastLineNum = doc.lineAt(node.to).number;
+						// The opening/closing ``` fence lines have no visible text once their
+						// marker is hidden (cursor away): leave them as plain, unstyled lines
+						// (same as any blank line elsewhere) instead of styling them as part of
+						// the code box, and move the rounded-corner/padding treatment onto the
+						// first/last line that still has real content. This avoids doubling the
+						// visible gap above/below the block, while keeping the fence line at its
+						// normal height so it stays clickable/navigable for editing the language
+						// tag. Skip this for an empty fence (no content lines at all) so there's
+						// still a box to show.
+						const hasContentLines = lastLineNum > firstLineNum + 1;
+						const firstFenceHidden =
+							hasContentLines && !cursorTouchesRange(state, doc.line(firstLineNum).from, doc.line(firstLineNum).to);
+						const lastFenceHidden =
+							hasContentLines && !cursorTouchesRange(state, doc.line(lastLineNum).from, doc.line(lastLineNum).to);
+						const firstContentLine = firstFenceHidden ? firstLineNum + 1 : firstLineNum;
+						const lastContentLine = lastFenceHidden ? lastLineNum - 1 : lastLineNum;
+						addLineRange(node.from, node.to, (n) => {
+							if (n === firstLineNum && firstFenceHidden) return '';
+							if (n === lastLineNum && lastFenceHidden) return '';
 							let cls = 'mlp-line-code';
-							if (first) cls += ' mlp-line-code-first';
-							if (last) cls += ' mlp-line-code-last';
+							if (n === firstContentLine) cls += ' mlp-line-code-first';
+							if (n === lastContentLine) cls += ' mlp-line-code-last';
 							return cls;
 						});
 						return; // descend to hide the ``` fence marks
