@@ -261,6 +261,21 @@ interface BlockAcc {
 function distributeBlockDecl(prop: string, value: string, acc: BlockAcc): void {
 	const p = prop.toLowerCase();
 	const set = (edge: 'Top' | 'Bottom' | 'Left' | 'Right', kind: 'pad' | 'mar', v: string) => {
+		// A theme's top margin is intentionally dropped rather than folded into
+		// padding-top like every other edge. Real CSS collapses adjacent
+		// vertical margins (only the larger of the two adjacent values takes
+		// effect); a `.cm-line` has no such mechanism, and this app can't
+		// know a rule's *previous sibling's* bottom margin at CSS-transform
+		// time to replicate that collapse. Left uncorrected, every block
+		// boundary stacks the previous block's bottom margin, this app's own
+		// mandatory blank source line (blank lines are real, visible text
+		// here, not just a parser separator the way they are in a rendered
+		// static preview), *and* the next block's top margin — visibly wider
+		// gaps than the same theme produces in a real rendered preview.
+		// Keeping only the bottom-margin side (plus the blank line) is a
+		// deliberate, imperfect approximation of collapsing: it recovers most
+		// of the doubled space without needing cross-rule/cross-line context.
+		if (kind === 'mar' && edge === 'Top') return;
 		acc[`${kind}${edge}` as keyof BlockAcc] = v as never; // last-wins per edge, per kind
 	};
 
