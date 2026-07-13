@@ -225,6 +225,11 @@ function buildDecorations(view: EditorView): DecorationSet {
 	// blockDecorationsField renders the whole frontmatter block as its own
 	// widget; skip it here too so this pass doesn't waste time computing
 	// marks/line-classes for a range that block-level decoration will cover.
+	// Only nodes *fully contained* in the block are skipped — fm.from is always
+	// 0, so a naive "any overlap" test also matches the tree's own root node
+	// (which spans the whole document) and would abort `tree.iterate` before it
+	// ever descends into anything, silently dropping every decoration in the
+	// entire document whenever frontmatter is present (see blockDecorations.ts).
 	const fm = detectFrontmatter(state);
 
 	const pushReplace = (from: number, to: number, deco: Decoration) => {
@@ -253,7 +258,7 @@ function buildDecorations(view: EditorView): DecorationSet {
 			from: rangeFrom,
 			to: rangeTo,
 			enter: (node) => {
-				if (fm && node.from < fm.to && node.to > fm.from) return false;
+				if (fm && node.from >= fm.from && node.to <= fm.to) return false;
 				const name = node.name;
 
 				if (name in HEADING_LINE_CLASS) {
@@ -316,7 +321,19 @@ function buildDecorations(view: EditorView): DecorationSet {
 					case 'InlineCode':
 						decorations.push(Decoration.mark({ tagName: 'code', class: 'mlp-inline-code' }).range(node.from, node.to));
 						return;
-					case 'Paragraph':
+					case 'Paragraph': {
+						// A list item's or blockquote's text is *also* wrapped in a
+						// Paragraph node in the syntax tree (CommonMark always has one
+						// there, "tight" list rendering just means the HTML omits the
+						// `<p>` tag). Skip the standalone-paragraph classes when that's
+						// the case: `ListItem`/`Blockquote` already add their own line
+						// classes for this same line above, and merging both sets of
+						// classes stacked a *second*, unrelated block's top/bottom
+						// padding onto the line — e.g. the paragraph rule's
+						// margin-bottom opening a gap under a blockquote whose own rule
+						// specifies no bottom padding at all.
+						const parentName = node.node.parent?.name;
+						if (parentName === 'ListItem' || parentName === 'Blockquote') return;
 						addLineRange(node.from, node.to, (_n, first, last) => {
 							let cls = 'mlp-line-paragraph';
 							if (first) cls += ' mlp-line-paragraph-first';
@@ -324,14 +341,28 @@ function buildDecorations(view: EditorView): DecorationSet {
 							return cls;
 						});
 						return;
-					case 'ListItem':
+					}
+					case 'ListItem': {
+						// `-first`/`-last` must reflect this item's position within the
+						// *enclosing list* (BulletList/OrderedList), not just within its
+						// own (usually single-line) range — `addLineRange`'s own
+						// first/last only sees the lines *this* ListItem spans, so every
+						// item in the list would otherwise come out as both first and
+						// last. That mattered once themes convert a `ul, ol { margin-bottom: … }`
+						// rule (meant to apply once, after the whole list) onto
+						// `-last`: with every item marked "last", every item picked up
+						// that trailing margin, spacing a tight list out like a loose one.
+						const parent = node.node.parent;
+						const isFirstItem = !parent || parent.firstChild?.from === node.from;
+						const isLastItem = !parent || parent.lastChild?.to === node.to;
 						addLineRange(node.from, node.to, (_n, first, last) => {
 							let cls = 'mlp-line-list';
-							if (first) cls += ' mlp-line-list-first';
-							if (last) cls += ' mlp-line-list-last';
+							if (first && isFirstItem) cls += ' mlp-line-list-first';
+							if (last && isLastItem) cls += ' mlp-line-list-last';
 							return cls;
 						});
 						return;
+					}
 					case 'Blockquote':
 						addLineRange(node.from, node.to, (_n, first, last) => {
 							let cls = 'mlp-line-quote';

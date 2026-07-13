@@ -22,10 +22,16 @@ function buildBlockDecorations(state: EditorState): DecorationSet {
 	// Frontmatter has no dedicated `@lezer/markdown` node, so it's detected by a
 	// plain line scan (see frontmatterWidget.ts) rather than via tree.iterate()
 	// below. Computed once up front so the tree walk can both render it and skip
-	// any node the parser mistakenly finds inside it (e.g. a YAML line that
-	// happens to look like a table row) — without that guard, a Table/FencedCode
-	// decoration overlapping this range would violate the sorted, non-overlapping
-	// range requirement `Decoration.set` enforces.
+	// any node the parser mistakenly finds *entirely inside* it (e.g. a YAML line
+	// that happens to look like a table row) — without that guard, a
+	// Table/FencedCode decoration overlapping this range would violate the
+	// sorted, non-overlapping range requirement `Decoration.set` enforces.
+	// The skip below only fires for nodes *fully contained* in [fm.from, fm.to),
+	// never for an ancestor that merely spans across the block (fm.from is
+	// always 0, so the tree's own root node always satisfies a naive "any
+	// overlap" test — that used to make `tree.iterate` skip its own root and
+	// silently produce zero decorations for the *entire* document whenever
+	// frontmatter was present, not just inside the frontmatter block).
 	const fm = detectFrontmatter(state);
 	if (fm && !cursorTouchesRange(state, fm.from, fm.to)) {
 		let widget: WidgetType;
@@ -41,7 +47,7 @@ function buildBlockDecorations(state: EditorState): DecorationSet {
 
 	tree.iterate({
 		enter: (node) => {
-			if (fm && node.from < fm.to && node.to > fm.from) return false;
+			if (fm && node.from >= fm.from && node.to <= fm.to) return false;
 			if (node.name === 'FencedCode') {
 				const infoNode = node.node.getChild('CodeInfo');
 				const lang = infoNode ? state.sliceDoc(infoNode.from, infoNode.to).trim().toLowerCase() : '';
