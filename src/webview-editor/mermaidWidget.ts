@@ -16,8 +16,12 @@ async function loadMermaid(): Promise<typeof import('mermaid')> {
 		startOnLoad: false,
 		securityLevel: 'strict',
 		theme: isDark ? 'dark' : 'default',
-		// Render at native size instead of shrinking to fit the editor's content
-		// width — the widget below provides its own pan/zoom for large diagrams.
+		// `useMaxWidth` is left disabled for every diagram type: it only controls
+		// whether Mermaid itself writes an inline `max-width` style on the SVG, and
+		// that inline style always wins over any CSS rule we'd add to scale it back
+		// down. Scaling for "fit" display mode below is done entirely via our own
+		// CSS class instead, so Mermaid's own shrink-to-fit logic is kept off in
+		// both display modes and the inline style is stripped after render.
 		flowchart: { useMaxWidth: false },
 		sequence: { useMaxWidth: false },
 		class: { useMaxWidth: false },
@@ -36,6 +40,8 @@ const MIN_SCALE = 0.2;
 const MAX_SCALE = 8;
 const DRAG_THRESHOLD_PX = 4;
 
+type DisplayMode = 'fit' | 'native';
+
 export class MermaidWidget extends WidgetType {
 	constructor(private readonly code: string) {
 		super();
@@ -48,11 +54,11 @@ export class MermaidWidget extends WidgetType {
 	toDOM(view: EditorView): HTMLElement {
 		// `wrap` is the widget's root: it hosts the toolbar as an overlay that
 		// must stay pinned to the corner regardless of scrolling. `container` is
-		// the actual pan/zoom/scroll viewport (native horizontal scrollbar via
-		// `overflow-x: auto`, plus drag-to-pan and Ctrl+wheel zoom); `canvas` is
-		// moved/scaled via a CSS transform inside it. Keeping the toolbar outside
-		// `container` means scrolling `container` can never carry the toolbar
-		// away with it.
+		// the pan/zoom/scroll viewport used in "native size" mode (native
+		// horizontal scrollbar via `overflow-x: auto`, plus drag-to-pan and
+		// Ctrl+wheel zoom); `canvas` is moved/scaled via a CSS transform inside
+		// it. Keeping the toolbar outside `container` means scrolling `container`
+		// can never carry the toolbar away with it.
 		const wrap = document.createElement('div');
 		wrap.className = 'mlp-mermaid-wrap';
 
@@ -65,14 +71,21 @@ export class MermaidWidget extends WidgetType {
 		canvas.textContent = 'Rendering diagram…';
 		container.appendChild(canvas);
 
-		// ── Pan / zoom state ────────────────────────────────────────────────────
+		// ── Display mode ─────────────────────────────────────────────────────────
+		// "fit" (default): the diagram shrinks to the available width, like a
+		// normal Markdown preview (GitHub, VS Code's built-in preview) — no pan,
+		// no zoom, no scrollbar needed. "native": the diagram renders at its real
+		// size with the drag-to-pan / Ctrl+wheel-zoom / horizontal-scrollbar
+		// controls below, for diagrams too dense to read once shrunk.
+		let mode: DisplayMode = 'fit';
+
+		// ── Pan / zoom state (native mode only) ──────────────────────────────────
 		let scale = 1;
 		let tx = 0;
 		let ty = 0;
 		const applyTransform = () => {
-			canvas.style.transform = `translate(${tx}px, ${ty}px) scale(${scale})`;
+			canvas.style.transform = mode === 'native' ? `translate(${tx}px, ${ty}px) scale(${scale})` : '';
 		};
-		applyTransform();
 
 		// Zoom by `factor` while keeping the point (px, py) — measured from the
 		// container's top-left — visually fixed under the cursor.
@@ -86,14 +99,14 @@ export class MermaidWidget extends WidgetType {
 			applyTransform();
 		};
 		const zoomCenter = (factor: number) => zoomAt(factor, container.clientWidth / 2, container.clientHeight / 2);
-		const reset = () => {
+		const resetPanZoom = () => {
 			scale = 1;
 			ty = 0;
 			tx = Math.max(0, (container.clientWidth - canvas.offsetWidth) / 2); // re-center horizontally
 			applyTransform();
 		};
 
-		// ── Toolbar (＋ / − / reset), shown on hover ─────────────────────────────
+		// ── Toolbar: mode toggle always shown; zoom controls only in native mode ──
 		const toolbar = document.createElement('div');
 		toolbar.className = 'mlp-mermaid-toolbar';
 		const makeButton = (label: string, title: string, onClick: () => void): HTMLButtonElement => {
@@ -111,16 +124,35 @@ export class MermaidWidget extends WidgetType {
 			});
 			return btn;
 		};
-		toolbar.appendChild(makeButton('+', '拡大 (Ctrl+ホイールでも可)', () => zoomCenter(1.2)));
-		toolbar.appendChild(makeButton('−', '縮小', () => zoomCenter(1 / 1.2)));
-		toolbar.appendChild(makeButton('↺', '元のサイズに戻す', reset));
+
+		const zoomInBtn = makeButton('+', '拡大 (Ctrl+ホイールでも可)', () => zoomCenter(1.2));
+		const zoomOutBtn = makeButton('−', '縮小', () => zoomCenter(1 / 1.2));
+		const zoomResetBtn = makeButton('↺', '元のサイズに戻す', resetPanZoom);
+		const modeToggleBtn = makeButton('', '', () => setMode(mode === 'fit' ? 'native' : 'fit'));
+		toolbar.append(modeToggleBtn, zoomInBtn, zoomOutBtn, zoomResetBtn);
 		wrap.appendChild(toolbar);
+
+		function setMode(next: DisplayMode): void {
+			mode = next;
+			container.classList.toggle('mlp-mermaid-native', mode === 'native');
+			zoomInBtn.style.display = mode === 'native' ? '' : 'none';
+			zoomOutBtn.style.display = mode === 'native' ? '' : 'none';
+			zoomResetBtn.style.display = mode === 'native' ? '' : 'none';
+			modeToggleBtn.textContent = mode === 'fit' ? '⤢' : '⤡';
+			modeToggleBtn.title =
+				mode === 'fit'
+					? '原寸大表示に切り替え（ドラッグでパン、Ctrl+ホイールでズームできます）'
+					: '自動縮小表示に戻す（表示幅に合わせて縮小し、スクロールなしで全体を表示します）';
+			if (mode === 'native') resetPanZoom();
+			else applyTransform();
+		}
+		setMode('fit');
 
 		// ── Ctrl/Cmd + wheel to zoom (plain wheel keeps scrolling the document) ──
 		container.addEventListener(
 			'wheel',
 			(e) => {
-				if (!(e.ctrlKey || e.metaKey)) return;
+				if (mode !== 'native' || !(e.ctrlKey || e.metaKey)) return;
 				e.preventDefault();
 				const rect = container.getBoundingClientRect();
 				zoomAt(e.deltaY < 0 ? 1.1 : 1 / 1.1, e.clientX - rect.left, e.clientY - rect.top);
@@ -128,7 +160,8 @@ export class MermaidWidget extends WidgetType {
 			{ passive: false },
 		);
 
-		// ── Drag to pan; a click without dragging enters the source for editing ──
+		// ── Drag to pan (native mode only); a click without dragging enters the
+		// source for editing ──────────────────────────────────────────────────────
 		let dragging = false;
 		let moved = false;
 		let startX = 0;
@@ -137,12 +170,12 @@ export class MermaidWidget extends WidgetType {
 		let originTy = 0;
 		container.addEventListener('pointerdown', (e) => {
 			if (e.button !== 0) return;
-			// Let the native horizontal scrollbar (`overflow-x: auto`) work
-			// normally: a press landing on the scrollbar track/thumb — below the
-			// actual content box — has `container` itself as the target (the
-			// scrollbar isn't a descendant element). Without this check, a short
-			// scrollbar drag reads as a plain click and drops the cursor into the
-			// diagram's source instead of just scrolling.
+			// Let the native horizontal scrollbar (`overflow-x: auto`, native mode
+			// only) work normally: a press landing on the scrollbar track/thumb —
+			// below the actual content box — has `container` itself as the target
+			// (the scrollbar isn't a descendant element). Without this check, a
+			// short scrollbar drag reads as a plain click and drops the cursor into
+			// the diagram's source instead of just scrolling.
 			if (e.target === container && (e.offsetX >= container.clientWidth || e.offsetY >= container.clientHeight)) {
 				return;
 			}
@@ -155,7 +188,7 @@ export class MermaidWidget extends WidgetType {
 			container.setPointerCapture(e.pointerId);
 		});
 		container.addEventListener('pointermove', (e) => {
-			if (!dragging) return;
+			if (!dragging || mode !== 'native') return;
 			const dx = e.clientX - startX;
 			const dy = e.clientY - startY;
 			if (!moved && Math.hypot(dx, dy) > DRAG_THRESHOLD_PX) {
@@ -176,6 +209,26 @@ export class MermaidWidget extends WidgetType {
 				container.releasePointerCapture(e.pointerId);
 			} catch {
 				/* pointer already released */
+			}
+			// Decide click-vs-drag from the *total* displacement at release time,
+			// not only from whether `pointermove` ever set `moved` — on some
+			// input devices (e.g. certain touchpad drivers) intermediate
+			// `pointermove` events can be dropped or never delivered to this
+			// handler at all (for instance if pointer capture silently fails for
+			// that pointer type), which left `moved` stuck at `false` even though
+			// the pointer clearly travelled: the release was then misread as a
+			// plain click and dropped the cursor into edit mode instead of
+			// panning. Recomputing the displacement here catches that case
+			// regardless of why the intermediate events were missed.
+			if (mode === 'native' && !moved) {
+				const dx = e.clientX - startX;
+				const dy = e.clientY - startY;
+				if (Math.hypot(dx, dy) > DRAG_THRESHOLD_PX) {
+					tx = originTx + dx;
+					ty = originTy + dy;
+					applyTransform();
+					return;
+				}
 			}
 			if (!moved) {
 				// A plain click: drop the cursor into the diagram's source so it can
@@ -198,9 +251,10 @@ export class MermaidWidget extends WidgetType {
 				// Defensive: some diagram types still emit an inline `max-width` style
 				// even with `useMaxWidth: false` in the config above. An inline style
 				// always wins over the stylesheet's `max-width: none`, so strip it
-				// here to guarantee the diagram renders at its native size.
+				// here to guarantee "native" mode renders at true native size; "fit"
+				// mode's own CSS (`.mlp-mermaid-canvas svg`) handles shrinking instead.
 				canvas.querySelector('svg')?.style.removeProperty('max-width');
-				reset(); // center once real dimensions are known
+				if (mode === 'native') resetPanZoom(); // center once real dimensions are known
 			})
 			.catch((err: unknown) => {
 				canvas.textContent = `Mermaid error: ${err instanceof Error ? err.message : String(err)}`;

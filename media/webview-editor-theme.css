@@ -166,11 +166,17 @@ html, body {
 
 .mlp-checkbox {
 	display: inline-block;
-	width: 1em;
-	height: 1em;
+	width: 1.2em;
+	height: 1.2em;
 	box-sizing: border-box;
-	vertical-align: -0.14em;
-	border: 1.5px solid var(--vscode-checkbox-border, #7a7a7a);
+	vertical-align: -0.26em;
+	/* A plain border on a transparent box reads as a stray thin outline at
+	   normal editor font sizes, easy to miss when scanning a list. Real VS
+	   Code's own checkbox control fills the box (`--vscode-checkbox-background`)
+	   in addition to bordering it, which gives it enough visual weight to read
+	   as a checkbox at a glance; match that here instead of leaving it hollow. */
+	background: var(--vscode-checkbox-background, rgba(127, 127, 127, 0.2));
+	border: 1.5px solid var(--vscode-checkbox-border, #8a8a8a);
 	border-radius: 3px;
 	cursor: pointer;
 	position: relative;
@@ -182,10 +188,10 @@ html, body {
 .mlp-checkbox-checked::after {
 	content: '';
 	position: absolute;
-	left: 0.28em;
-	top: 0.06em;
-	width: 0.24em;
-	height: 0.5em;
+	left: 0.34em;
+	top: 0.08em;
+	width: 0.29em;
+	height: 0.6em;
 	border: solid #fff;
 	border-width: 0 2px 2px 0;
 	transform: rotate(45deg);
@@ -276,26 +282,34 @@ table.mlp-frontmatter td pre {
 /* ── Mermaid ──────────────────────────────────────────────────────────────
    `.mlp-mermaid-wrap` is the block-level box in the document flow and the
    positioning root for the toolbar overlay. `.mlp-mermaid` inside it is the
-   actual scroll/pan/zoom viewport: a native horizontal scrollbar
-   (`overflow-x: auto`) for oversized diagrams, plus drag-to-pan and
-   Ctrl/⌘+wheel zoom on top via a CSS transform on `.mlp-mermaid-canvas`.
-   `max-width: 100%` keeps an oversized diagram from growing past this box
-   (see also the `.cm-content { min-width: 0 }` fix, without which this box's
-   own content could still stretch its ancestor). The toolbar lives outside
-   `.mlp-mermaid` (a sibling under the wrap, not a descendant) specifically so
-   scrolling the diagram can never carry it out of view along with the
-   content. */
+   diagram viewport, in one of two display modes toggled by mermaidWidget.ts
+   via the `.mlp-mermaid-native` class:
+   - Default ("fit"): matches an ordinary Markdown preview (GitHub, VS Code's
+     built-in preview) — the diagram shrinks to the available width via plain
+     CSS, no scrollbar, no pan/zoom.
+   - "native" (opt-in via the toolbar toggle): the diagram renders at its real
+     size, with a horizontal scrollbar (`overflow-x: auto`) plus drag-to-pan
+     and Ctrl/⌘+wheel zoom on top via a CSS transform on `.mlp-mermaid-canvas`,
+     for diagrams too dense to read once shrunk.
+   `max-width: 100%` keeps an oversized diagram from growing past this box in
+   native mode (see also the `.cm-content { min-width: 0 }` fix, without which
+   this box's own content could still stretch its ancestor). The toolbar lives
+   outside `.mlp-mermaid` (a sibling under the wrap, not a descendant)
+   specifically so scrolling the diagram (native mode) can never carry it out
+   of view along with the content. */
 .mlp-mermaid-wrap {
 	position: relative;
 	margin: 0.5em 0;
 }
 .mlp-mermaid {
 	max-width: 100%;
+	border-radius: 6px;
+	background: var(--vscode-textCodeBlock-background, rgba(127, 127, 127, 0.06));
+}
+.mlp-mermaid.mlp-mermaid-native {
 	overflow-x: auto;
 	overflow-y: hidden;
 	max-height: 70vh;
-	border-radius: 6px;
-	background: var(--vscode-textCodeBlock-background, rgba(127, 127, 127, 0.06));
 	cursor: grab;
 	/* Keep panning gestures from scrolling the page/editor instead. */
 	touch-action: none;
@@ -305,13 +319,32 @@ table.mlp-frontmatter td pre {
 }
 .mlp-mermaid-canvas {
 	transform-origin: 0 0;
-	display: inline-block;
 	/* The rendered SVG must not intercept the drag; the container handles it. */
 	user-select: none;
 }
+.mlp-mermaid:not(.mlp-mermaid-native) .mlp-mermaid-canvas {
+	display: block;
+}
+.mlp-mermaid.mlp-mermaid-native .mlp-mermaid-canvas {
+	display: inline-block;
+}
 .mlp-mermaid-canvas svg {
 	display: block;
-	max-width: none; /* allow zooming beyond the container width */
+	max-width: none; /* native mode: allow zooming beyond the container width */
+}
+.mlp-mermaid:not(.mlp-mermaid-native) .mlp-mermaid-canvas svg {
+	/* Fit mode: shrink an oversized diagram down to the column width, like a
+	   normal preview. `max-width` alone (no `width`) only ever shrinks — a
+	   small diagram (e.g. a single node) keeps its natural size instead of
+	   being stretched up to fill the full column, which would blow it up to
+	   an oversized, illegibly-large box. A diagram narrower than the column
+	   is centered (`margin: 0 auto`), matching how GitHub/VS Code's own
+	   preview centers a small image or diagram instead of pinning it to the
+	   left edge.
+	*/
+	max-width: 100%;
+	height: auto;
+	margin: 0 auto;
 }
 
 /* Toolbar: hidden until the diagram is hovered, pinned top-right — positioned
