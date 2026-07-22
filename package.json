@@ -2,7 +2,7 @@
   "name": "markdown-live-preview-editor",
   "displayName": "Markdown Live Preview Editor",
   "description": "Obsidian-style editable live Markdown preview with custom CSS themes, Mermaid diagrams, and syntax-highlighted code blocks.",
-  "version": "0.0.4",
+  "version": "0.0.5",
   "publisher": "t-shoot",
   "license": "MIT",
   "icon": "media/icon-128.png",
