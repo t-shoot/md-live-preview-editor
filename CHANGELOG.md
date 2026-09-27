@@ -5,6 +5,37 @@
 All notable changes to this extension are documented here.
 This project follows [Semantic Versioning](https://semver.org/).
 
+## [0.3.0] — 2026-09-28
+
+### Changed
+
+- **Tables, Mermaid/draw.io diagrams, and YAML frontmatter now switch between
+  their rendered view and raw source only through their own buttons.**
+  Previously the caret's mere position decided this, so opening a document
+  that started with one of these, searching for text inside one, or tabbing
+  between table cells could flip it to raw text without being asked. Diagrams
+  and frontmatter gained the same "back to rendered view" button tables
+  already had (next to the existing `</>` button that reveals the source),
+  and frontmatter's raw YAML now gets the same tinted background a raw table
+  or a fenced code block gets, instead of none at all.
+
+### Fixed
+
+- **Bold, italic, strikethrough, list markers, and inline code no longer
+  reveal their raw Markdown just because the caret is elsewhere on the same
+  line.** Editing the end of a list item's text showed its raw `-`, and a
+  `**bold**` run elsewhere on the line stayed exposed too — both now react
+  only to the caret actually touching them.
+- Dragging to select text starting exactly on a bullet point (`•`) now starts
+  the selection; it previously did nothing, since the bullet ignored the
+  press that began it.
+- Drag-selected text stays visible inside a fenced code block. Depending on
+  the color theme, the highlight could render fully invisible there, hidden
+  behind the code block's own background.
+- Finishing an edit in a table cell (`Escape`, `Enter`, or clicking a
+  different cell) no longer leaves a stray cursor visible elsewhere in the
+  document.
+
 ## [0.2.0] — 2026-09-10
 
 ### Added
@@ -273,6 +304,36 @@ callouts and export are still missing.
 
 この拡張機能の主な変更点をまとめています。
 バージョン番号は [セマンティック バージョニング](https://semver.org/lang/ja/) に従っています。
+
+## [0.3.0] — 2026-09-28
+
+### 変更
+
+- **テーブル・Mermaid/draw.io の図・YAML フロントマターが、表示済みの見た目と
+  生の記法をボタンでのみ切り替えるようになりました。** これまではカーソルの
+  位置だけで切り替わっていたため、これらのいずれかで始まる文書を開いた瞬間や、
+  内容を検索でヒットさせたとき、テーブルのセル間を Tab で移動したときなどに、
+  意図せず生の記法に変わってしまうことがありました。図とフロントマターにも、
+  テーブルに既にあった「表示済みの見た目に戻る」ボタンを追加しました(生の記法を
+  表示する既存の `</>` ボタンの隣にあります)。また、フロントマターの生の YAML
+  表示にも、テーブルやコードブロックの生表示と同じ色付きの背景を付けるように
+  しました(これまでは背景が付いていませんでした)。
+
+### 修正
+
+- **太字・斜体・取り消し線・箇条書きの記号・インラインコードが、同じ行の
+  離れた場所にカーソルがあるだけで生のMarkdown記法を表示してしまう問題を
+  修正しました。** 箇条書き項目の末尾を編集しただけで生の `-` が表示されたり、
+  行の別の場所にある `**太字**` の記号が表示されたままになる問題があり、
+  カーソルが実際にその部分に触れているときだけ反応するようにしました。
+- 箇条書きの「•」の真上からドラッグして選択を始められるようになりました。
+  以前は「•」がクリックを無視してしまい、そこから始まる選択操作が
+  何も起こりませんでした。
+- コードブロックの中で選択した文字が見えるようになりました。配色テーマに
+  よっては、選択のハイライトがコードブロック自体の背景色に隠れて
+  完全に見えなくなることがありました。
+- テーブルのセルの編集を終えたとき(`Escape`・`Enter`・別セルのクリック)、
+  文書内の別の場所にカーソルが一瞬表示されてしまう問題を修正しました。
 
 ## [0.2.0] — 2026-09-10
 
