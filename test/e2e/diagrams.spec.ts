@@ -69,6 +69,35 @@ test.describe('diagram widgets', () => {
 			timeout: 10_000,
 		});
 	});
+
+	// A diagram is a "図" block: it switches between rendered and raw source only
+	// through its own buttons, never by where the caret happens to be — see
+	// `isBlockRevealed` in cmUtils.ts. Mirrors the same guarantee already tested
+	// for tables in editing.spec.ts.
+	test('a diagram at document position 0 does not auto-reveal as raw source', async ({ page }) => {
+		// The caret starts at position 0 — right on the fence's own opening line,
+		// the exact accidental-reveal case this is meant to rule out.
+		await mountEditor(page, '```mermaid\ngraph TD;\n  A-->B;\n```\n\nAfter\n');
+		await expect(page.locator('.mlp-mermaid-wrap svg')).toBeVisible({ timeout: 20_000 });
+	});
+
+	test('the render button returns a revealed diagram to its rendered form', async ({ page }) => {
+		await mountEditor(page, 'Intro\n\n```mermaid\ngraph TD;\n  A-->B;\n```\n\nAfter\n');
+		await expect(page.locator('.mlp-mermaid-wrap svg')).toBeVisible({ timeout: 20_000 });
+
+		await page.locator('.mlp-code-mode-btn').first().click();
+		await expect(page.locator('.mlp-mermaid-wrap')).toHaveCount(0);
+		await expect(page.locator('.mlp-render-mode-btn')).toHaveCount(1);
+
+		// Moving the caret around the raw fence must not affect anything —
+		// only the button does.
+		await page.keyboard.press('ArrowDown');
+		await page.keyboard.press('End');
+		await expect(page.locator('.mlp-render-mode-btn')).toHaveCount(1);
+
+		await page.locator('.mlp-render-mode-btn').click();
+		await expect(page.locator('.mlp-mermaid-wrap svg')).toBeVisible({ timeout: 20_000 });
+	});
 });
 
 /** The id the widget used when it asked the host for a file. */

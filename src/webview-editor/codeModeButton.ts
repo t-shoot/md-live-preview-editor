@@ -1,22 +1,22 @@
 import type { EditorView } from '@codemirror/view';
-import { allowRevealOnce } from './cmUtils';
+import { blockRevealChanged } from './cmUtils';
 import { t } from '../shared/i18n';
 
 /**
- * The "show me the source" control shared by every rendered block widget
- * (tables, Mermaid diagrams, frontmatter).
+ * The "show me the source" control shared by every rendered "図" block
+ * (tables, Mermaid/draw.io diagrams, frontmatter).
  *
  * Each of these widgets replaces a run of Markdown with a rendered view, and
- * each needs a way back to the text behind it — to fix a diagram's syntax, to
- * add a table row, to correct a YAML key. Putting the caret inside the block is
- * what does it: `cursorTouchesRange` (cmUtils.ts) then withholds the widget and
- * the raw source shows through.
- *
- * Clicking the block itself used to be that gesture, and for Mermaid and
- * frontmatter it still is. It cannot be for tables, where a click now edits a
- * cell in place, so the way back had to become an explicit control. Giving the
- * same control to every block keeps one visible, predictable route to the
- * source rather than a rule that differs per block type.
+ * each needs an explicit way back to the text behind it — to fix a diagram's
+ * syntax, to add a table row, to correct a YAML key. These blocks change
+ * appearance too drastically for a click on the rendered form, or the caret
+ * merely landing nearby, to safely mean "show source" — a table's click edits
+ * a cell in place, and a diagram's click pans it — so reaching the source is
+ * this button's job alone, for every "図" block alike (see `isBlockRevealed`
+ * in cmUtils.ts). `onReveal`, when given, marks the block explicitly revealed;
+ * omitted by the one caller that *isn't* a "図" block — the generic fenced
+ * code block's own `</>`, which only jumps the caret onto its already-visible
+ * fence line and needs no such flag.
  */
 export interface CodeModeButtonOptions {
 	/** Element the button is positioned against; also the fallback caret target. */
@@ -28,6 +28,11 @@ export interface CodeModeButtonOptions {
 	caretPos?: () => number;
 	/** Runs before the caret moves — used by the table to save a pending edit. */
 	beforeShow?: () => number | null;
+	/**
+	 * Marks this button's own "図" block as explicitly revealed. Omit for a
+	 * plain fenced code block's fence-reveal button, which isn't one.
+	 */
+	onReveal?: () => void;
 }
 
 /** Builds the `</>` button. The caller decides where to place it. */
@@ -53,17 +58,54 @@ export function createCodeModeButton(view: EditorView, options: CodeModeButtonOp
 	button.addEventListener('click', (event) => {
 		event.preventDefault();
 		event.stopPropagation();
-		// This reveal is deliberate, so lift the guard that suppresses an accidental
-		// one (cmUtils.ts). The button's own press never reaches the block, so the
-		// guard would otherwise still be set and the source would not appear.
-		allowRevealOnce();
+		options.onReveal?.();
 		const committed = options.beforeShow?.() ?? null;
 		const pos = committed ?? options.caretPos?.() ?? view.posAtDOM(options.anchor);
 		view.dispatch({
 			selection: { anchor: Math.min(Math.max(pos, 0), view.state.doc.length) },
+			effects: options.onReveal ? blockRevealChanged.of(null) : undefined,
 			scrollIntoView: true,
 		});
 		view.focus();
+	});
+	return button;
+}
+
+// A squared-plus reads as a simple grid, the same idea as `▦` (crosshatch
+// fill) without that glyph's problem: most monospace fonts draw its ink
+// noticeably above center within its own em box, which put it visibly off
+// vertical-center inside the button next to the `</>` control's own glyph,
+// centered normally. `⊞` sits centered the same way `</>` does.
+const RENDER_MODE_GLYPH = '⊞';
+
+/**
+ * Builds the "▦" button that switches a "図" block's raw Markdown view back
+ * to its rendered form.
+ *
+ * Deliberately just chrome: `onClick` does the entire mode switch (clearing
+ * the explicit-reveal flag, moving the caret to a safe spot outside the
+ * block, dispatching `blockRevealChanged`) because each block type finds its
+ * own current extent differently — a table by re-reading its `Table` node
+ * (see `caretPastTable`), a diagram or frontmatter by re-scanning for theirs.
+ */
+export function createRenderModeButton(onClick: () => void): HTMLButtonElement {
+	const button = document.createElement('button');
+	button.type = 'button';
+	button.className = 'mlp-render-mode-btn';
+	button.textContent = RENDER_MODE_GLYPH;
+	button.title = t('render.toggle.title');
+	button.setAttribute('aria-label', t('render.toggle.aria'));
+	// Same reasoning as the `</>` button's own mousedown handler: the press must
+	// not reach the raw text underneath, or CodeMirror would place its own caret
+	// there first.
+	button.addEventListener('mousedown', (event) => {
+		event.preventDefault();
+		event.stopPropagation();
+	});
+	button.addEventListener('click', (event) => {
+		event.preventDefault();
+		event.stopPropagation();
+		onClick();
 	});
 	return button;
 }

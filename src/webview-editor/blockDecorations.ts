@@ -1,12 +1,12 @@
-import { StateEffect, StateField, type EditorState, type Range } from '@codemirror/state';
-import { Decoration, DecorationSet, EditorView, ViewPlugin, WidgetType } from '@codemirror/view';
+import { StateField, type EditorState, type Range } from '@codemirror/state';
+import { Decoration, DecorationSet, EditorView, WidgetType } from '@codemirror/view';
 import { syntaxTree } from '@codemirror/language';
 import { parse as parseYaml } from 'yaml';
 import { MermaidWidget } from './mermaidWidget';
 import { DrawioWidget } from './drawioWidget';
 import { isDiagramLang } from './diagramLang';
 import { buildTableWidget, isLineAligned, alignedBlockRange } from './livePreviewPlugin';
-import { blockCursorTouchesRange, noteRevealed, onPointerRelease } from './cmUtils';
+import { isBlockRevealed, blockRevealChanged } from './cmUtils';
 import { detectFrontmatter, FrontmatterWidget, FrontmatterEmptyWidget, FrontmatterErrorWidget } from './frontmatterWidget';
 
 /**
@@ -35,16 +35,15 @@ function buildBlockDecorations(state: EditorState): DecorationSet {
 	// silently produce zero decorations for the *entire* document whenever
 	// frontmatter was present, not just inside the frontmatter block).
 	const fm = detectFrontmatter(state);
-	const fmRevealed = fm ? blockCursorTouchesRange(state, fm.from, fm.to) : false;
-	if (fm) noteRevealed(fm.from, fm.to, fmRevealed);
+	const fmRevealed = fm ? isBlockRevealed(fm.from) : false;
 	if (fm && !fmRevealed) {
 		let widget: WidgetType;
 		try {
 			const data = parseYaml(fm.yamlText) ?? {};
 			const entries = Object.entries(data);
-			widget = entries.length === 0 ? new FrontmatterEmptyWidget() : new FrontmatterWidget(entries);
+			widget = entries.length === 0 ? new FrontmatterEmptyWidget() : new FrontmatterWidget(entries, fm.from);
 		} catch (err) {
-			widget = new FrontmatterErrorWidget(err instanceof Error ? err.message : String(err));
+			widget = new FrontmatterErrorWidget(err instanceof Error ? err.message : String(err), fm.from);
 		}
 		decorations.push(Decoration.replace({ widget, block: true }).range(fm.from, fm.to));
 	}
@@ -57,21 +56,19 @@ function buildBlockDecorations(state: EditorState): DecorationSet {
 				const lang = infoNode ? state.sliceDoc(infoNode.from, infoNode.to).trim().toLowerCase() : '';
 				const diagram = isDiagramLang(lang);
 				if (!diagram) return;
-				const diagramRevealed = blockCursorTouchesRange(state, node.from, node.to);
-				noteRevealed(node.from, node.to, diagramRevealed);
-				if (diagramRevealed) return;
+				const blockFrom = state.doc.lineAt(node.from).from;
+				if (isBlockRevealed(blockFrom)) return;
 				if (!isLineAligned(state, node.from, node.to)) return;
 				const textNode = node.node.getChild('CodeText');
 				const code = textNode ? state.sliceDoc(textNode.from, textNode.to) : '';
 				if (!code.trim()) return;
-				const widget = diagram === 'mermaid' ? new MermaidWidget(code) : new DrawioWidget(code);
+				const widget = diagram === 'mermaid' ? new MermaidWidget(code, blockFrom) : new DrawioWidget(code, blockFrom);
 				decorations.push(Decoration.replace({ widget, block: true }).range(node.from, node.to));
 				return false;
 			}
 			if (node.name === 'Table') {
-				const tableRevealed = blockCursorTouchesRange(state, node.from, node.to);
-				noteRevealed(node.from, node.to, tableRevealed);
-				if (tableRevealed) return;
+				const tableFrom = state.doc.lineAt(node.from).from;
+				if (isBlockRevealed(tableFrom)) return;
 				const range = alignedBlockRange(state, node.from, node.to);
 				if (!range) return;
 				decorations.push(
@@ -85,69 +82,21 @@ function buildBlockDecorations(state: EditorState): DecorationSet {
 	return Decoration.set(decorations, true);
 }
 
-/** Asks the field below to rebuild even though the editor state is unchanged. */
-const refreshBlocks = StateEffect.define<null>();
-
-/**
- * Nudges the editor into rebuilding its block decorations when a drag ends.
- *
- * `blockCursorTouchesRange` answers differently once the mouse comes up (see
- * cmUtils.ts), but a release is not a state change, so nothing would otherwise
- * schedule the rebuild — a block the caret landed inside during a drag would
- * stay rendered until the next unrelated edit. Dispatching an empty transaction
- * re-runs the field's `update` with the selection unchanged.
- */
-/** Whether two decoration sets cover exactly the same ranges. */
-function sameRanges(a: DecorationSet, b: DecorationSet): boolean {
-	if (a.size !== b.size) return false;
-	const ia = a.iter();
-	const ib = b.iter();
-	while (ia.value || ib.value) {
-		if (!ia.value || !ib.value || ia.from !== ib.from || ia.to !== ib.to) return false;
-		ia.next();
-		ib.next();
-	}
-	return true;
-}
-
-export const dragReleaseRefresh = ViewPlugin.fromClass(
-	class {
-		private readonly off: () => void;
-		constructor(view: EditorView) {
-			this.off = onPointerRelease(() => {
-				// The release fires during the DOM event; let CodeMirror finish
-				// applying its own selection change for that gesture first.
-				setTimeout(() => {
-					if (!view.dom.isConnected) return;
-					// Only when the rebuild would actually change something. The
-					// release sets the post-gesture suppression, so an unconditional
-					// refresh re-rendered the very block whose source the user had
-					// just opened — it flashed back to a rendered table for a frame,
-					// until the next keystroke lifted the suppression again.
-					if (sameRanges(buildBlockDecorations(view.state), view.state.field(blockDecorationsField))) return;
-					view.dispatch({ effects: refreshBlocks.of(null) });
-				}, 0);
-			});
-		}
-		destroy() {
-			this.off();
-		}
-	},
-);
-
 export const blockDecorationsField = StateField.define<DecorationSet>({
 	create(state) {
 		return buildBlockDecorations(state);
 	},
 	update(value, tr) {
-		// Rebuild on edits, on selection moves (a cursor entering a block reveals
-		// its raw source), and when background parsing advances the syntax tree —
-		// the latter matters because blocks near the end of a long document aren't
-		// in the tree yet on the first render.
+		// Rebuild on edits, when a "図" block's own button flips `isBlockRevealed`
+		// (see cmUtils.ts — plain module state, invisible to this field unless a
+		// transaction says so), and when background parsing advances the syntax
+		// tree — the last one matters because blocks near the end of a long
+		// document aren't in the tree yet on the first render. Deliberately *not*
+		// on `tr.selection`: a "図" block's rendered-vs-raw state no longer
+		// depends on the caret at all.
 		if (
 			tr.docChanged ||
-			tr.selection ||
-			tr.effects.some((e) => e.is(refreshBlocks)) ||
+			tr.effects.some((e) => e.is(blockRevealChanged)) ||
 			syntaxTree(tr.startState) !== syntaxTree(tr.state)
 		) {
 			return buildBlockDecorations(tr.state);

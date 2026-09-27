@@ -1,11 +1,6 @@
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect } from 'vitest';
 import { EditorState, EditorSelection } from '@codemirror/state';
-import {
-	cursorTouchesRange,
-	blockCursorTouchesRange,
-	setPointerDownForTesting,
-	setSuppressForTesting,
-} from './cmUtils';
+import { cursorTouchesRange } from './cmUtils';
 import {
 	searchRevealExtension,
 	searchRowFor,
@@ -63,27 +58,14 @@ describe('selectionIsSearchMatch', () => {
 });
 
 describe('cursorTouchesRange with a search match', () => {
-	beforeEach(() => {
-		setPointerDownForTesting(false);
-		setSuppressForTesting(false);
-	});
+	// `tableRange` below just supplies a convenient, arbitrary [from, to) span —
+	// a table's own reveal no longer goes through `cursorTouchesRange` at all
+	// (see `isBlockRevealed` in cmUtils.ts: a table, like every "図" block,
+	// switches only through its own button, a search match inside it included).
+	// What is still under test here is the shared inline mechanism itself —
+	// the one headings, bold text, and other "一般的な文章" constructs use.
 
-	it('still ignores an ordinary sweep across the block', () => {
-		// A drag-select across the table is a copy, not a request to edit it. That
-		// protection is a block-level rule, so it is `blockCursorTouchesRange` that
-		// enforces it — inline constructs deliberately do reveal for a sweep.
-		const state = stateWith(0, DOC.length - 1);
-		const { from, to } = tableRange(state);
-		expect(blockCursorTouchesRange(state, from, to)).toBe(false);
-	});
-
-	it('reveals a block when the sweep is a search match', () => {
-		const state = markAsMatch(stateWith(0, DOC.length - 1));
-		const { from, to } = tableRange(state);
-		expect(blockCursorTouchesRange(state, from, to)).toBe(true);
-	});
-
-	it('reveals the block when the selection is a search match inside it', () => {
+	it('reveals the range when the selection is a search match inside it', () => {
 		const plain = stateWith(0);
 		const { from, to } = tableRange(plain);
 		const state = markAsMatch(stateWith(from + 2, from + 3));
@@ -138,11 +120,6 @@ describe('cursorTouchesRange for an inline image', () => {
 			extensions: [searchRevealExtension],
 		});
 	}
-
-	beforeEach(() => {
-		setPointerDownForTesting(false);
-		setSuppressForTesting(false);
-	});
 
 	it('reveals the image when a search match lands on its URL', () => {
 		const urlAt = IMG_DOC.indexOf('assets/pic.png');

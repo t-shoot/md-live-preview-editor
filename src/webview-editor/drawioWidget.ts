@@ -1,6 +1,7 @@
 import { EditorView, WidgetType } from '@codemirror/view';
 import { wrapBlockWidget } from './blockWidgetWrap';
 import { createCodeModeButton } from './codeModeButton';
+import { setBlockRevealed } from './cmUtils';
 import {
 	renderParsedDiagram,
 	parseDrawioPages,
@@ -38,12 +39,15 @@ const DRAG_THRESHOLD_PX = 4;
 type DisplayMode = 'fit' | 'native';
 
 export class DrawioWidget extends WidgetType {
-	constructor(private readonly code: string) {
+	constructor(
+		private readonly code: string,
+		private readonly blockFrom: number,
+	) {
 		super();
 	}
 
 	eq(other: DrawioWidget): boolean {
-		return other.code === this.code;
+		return other.code === this.code && other.blockFrom === this.blockFrom;
 	}
 
 	toDOM(view: EditorView): HTMLElement {
@@ -107,7 +111,10 @@ export class DrawioWidget extends WidgetType {
 		const zoomOutBtn = makeButton('−', t('zoom.out'), () => zoomCenter(1 / 1.2));
 		const zoomResetBtn = makeButton('↺', t('zoom.reset'), () => setMode('fit'));
 		const modeToggleBtn = makeButton('', '', () => setMode(mode === 'fit' ? 'native' : 'fit'));
-		const codeModeBtn = createCodeModeButton(view, { anchor: wrap });
+		const codeModeBtn = createCodeModeButton(view, {
+			anchor: wrap,
+			onReveal: () => setBlockRevealed(this.blockFrom, true),
+		});
 
 		// ── Page switcher, shown only for a file that actually has pages to switch
 		// between ────────────────────────────────────────────────────────────────
@@ -304,12 +311,13 @@ export class DrawioFileWidget extends WidgetType {
 	constructor(
 		private readonly src: string,
 		private readonly alt: string,
+		private readonly blockFrom: number,
 	) {
 		super();
 	}
 
 	eq(other: DrawioFileWidget): boolean {
-		return other.src === this.src && other.alt === this.alt;
+		return other.src === this.src && other.alt === this.alt && other.blockFrom === this.blockFrom;
 	}
 
 	toDOM(view: EditorView): HTMLElement {
@@ -330,7 +338,7 @@ export class DrawioFileWidget extends WidgetType {
 				// `DrawioWidget.toDOM` returns an already-wrapped block; this widget's
 				// own host is that wrapper, so swap in the wrapper's child to avoid
 				// nesting two `.mlp-block` boxes and doubling the vertical padding.
-				const rendered = new DrawioWidget(xml).toDOM(view);
+				const rendered = new DrawioWidget(xml, this.blockFrom).toDOM(view);
 				host.replaceChildren(...Array.from(rendered.childNodes));
 				// The file arrived after CodeMirror measured the placeholder, and it
 				// cannot observe the swap — without this the height map keeps the

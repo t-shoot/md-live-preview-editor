@@ -11,6 +11,7 @@ import { ensureSyntaxTree } from '@codemirror/language';
 import type { SyntaxNode } from '@lezer/common';
 import { readCells, resolveImageSrc, blankLineAfter, blockReplacedLines } from './livePreviewPlugin';
 import { blockDecorationsField } from './blockDecorations';
+import { setBlockRevealed, clearBlockRevealedForTesting } from './cmUtils';
 
 /** Builds a 2-row GFM table (header + one data row) from a list of cell values. */
 function tableFor(cells: string[]): string {
@@ -207,24 +208,33 @@ describe('blockReplacedLines', () => {
 		expect(skippedLines('- d:\n  ```js\n  const x = 1;\n  ```\n')).toEqual([]);
 	});
 
-	it('cedes nothing while the cursor sits in the table, which stays raw source', () => {
+	it('cedes nothing while the table is explicitly switched to raw source', () => {
+		// A "図" block like this nested table only shows raw source once its own
+		// `</>` button set `isBlockRevealed` — the caret merely sitting on one of
+		// its lines (once how this test drove the same scenario) no longer has
+		// any effect at all. See `isBlockRevealed` in cmUtils.ts.
 		const doc = '- weight:\n  | act | pt |\n  |---|---|\n  | a | 1 |\n';
 		const state = EditorState.create({
 			doc,
 			extensions: [markdown({ extensions: AppGFM })],
-			selection: { anchor: doc.indexOf('| act') + 2 },
 		});
-		ensureSyntaxTree(state, state.doc.length, 5000);
-		const tree = ensureSyntaxTree(state, state.doc.length, 5000)!;
-		const all = new Set<number>();
-		tree.iterate({
-			enter(node) {
-				if (node.name !== 'ListItem') return;
-				for (const line of blockReplacedLines(state, node.node)) all.add(line);
-			},
-		});
-		// No widget replaces those lines, so they must keep their list styling.
-		expect([...all]).toEqual([]);
+		const tree = ensureSyntaxTree(state, state.doc.length, 5000);
+		if (!tree) throw new Error('syntax tree did not finish parsing in time');
+		const tableLineStart = state.doc.lineAt(doc.indexOf('| act')).from;
+		setBlockRevealed(tableLineStart, true);
+		try {
+			const all = new Set<number>();
+			tree.iterate({
+				enter(node) {
+					if (node.name !== 'ListItem') return;
+					for (const line of blockReplacedLines(state, node.node)) all.add(line);
+				},
+			});
+			// No widget replaces those lines, so they must keep their list styling.
+			expect([...all]).toEqual([]);
+		} finally {
+			clearBlockRevealedForTesting();
+		}
 	});
 
 	it('agrees with the block decorations actually produced for the same document', () => {

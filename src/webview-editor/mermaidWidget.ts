@@ -2,6 +2,7 @@ import { EditorView, WidgetType } from '@codemirror/view';
 import { wrapBlockWidget } from './blockWidgetWrap';
 import { loadMermaidModule, type MermaidApi } from './mermaidLoader';
 import { createCodeModeButton } from './codeModeButton';
+import { setBlockRevealed } from './cmUtils';
 import { t } from '../shared/i18n';
 
 // The module load is cached by `loadMermaidModule`, but `initialize()` is
@@ -43,12 +44,15 @@ const DRAG_THRESHOLD_PX = 4;
 type DisplayMode = 'fit' | 'native';
 
 export class MermaidWidget extends WidgetType {
-	constructor(private readonly code: string) {
+	constructor(
+		private readonly code: string,
+		private readonly blockFrom: number,
+	) {
 		super();
 	}
 
 	eq(other: MermaidWidget): boolean {
-		return other.code === this.code;
+		return other.code === this.code && other.blockFrom === this.blockFrom;
 	}
 
 	toDOM(view: EditorView): HTMLElement {
@@ -135,10 +139,14 @@ export class MermaidWidget extends WidgetType {
 		// at the diagram is the fitted view they began with.
 		const zoomResetBtn = makeButton('↺', t('zoom.reset'), () => setMode('fit'));
 		const modeToggleBtn = makeButton('', '', () => setMode(mode === 'fit' ? 'native' : 'fit'));
-		// Same control every rendered block carries, so the way back to the source
-		// is in the same place whatever the block is. Clicking the diagram itself
-		// still works too — this just makes the route visible.
-		const codeModeBtn = createCodeModeButton(view, { anchor: wrap });
+		// Same control every rendered "図" block carries, so the way back to the
+		// source is in the same place whatever the block is. Clicking the
+		// rendered diagram itself never does this — see `endDrag` below — so
+		// this button is the only route in.
+		const codeModeBtn = createCodeModeButton(view, {
+			anchor: wrap,
+			onReveal: () => setBlockRevealed(this.blockFrom, true),
+		});
 		toolbar.append(codeModeBtn, modeToggleBtn, zoomInBtn, zoomOutBtn, zoomResetBtn);
 		wrap.appendChild(toolbar);
 

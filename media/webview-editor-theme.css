@@ -77,6 +77,25 @@ html, body {
 .cm-content ::selection {
 	background: var(--vscode-editor-selectionBackground, rgba(120, 160, 255, 0.35));
 }
+/* `drawSelection()` paints the highlight *behind* line content by default
+   (`selectionLayer`'s `above: false` in @codemirror/view sets it to
+   z-index -1, versus the cursor layer's own `above: true`). An ordinary
+   `.cm-line` has no background, so nothing is drawn there and the layer
+   underneath shows through — but a rendered block's own line background (the
+   fenced-code box below, a blockquote's tint) is normal, non-positioned
+   content, which always paints *after* a negative z-index layer regardless of
+   its own opacity. Under a theme whose `--vscode-textCodeBlock-background` or
+   `--vscode-textBlockQuote-background` is close to opaque — common for dark
+   themes — that fully hid a drag-selection made across code or quoted text:
+   the caret still showed (the cursor layer already floats above), but no
+   highlight did. Raising the selection layer to a positive z-index, same as
+   the cursor layer, fixes it for every line uniformly; the highlight's own
+   alpha keeps text legible through it, same as a highlighter mark. Kept below
+   the code block's floating controls (`.mlp-copy-code-host`, z-index 2) so a
+   selection sweeping under them doesn't cover the buttons themselves. */
+.cm-layer.cm-selectionLayer {
+	z-index: 1 !important;
+}
 
 /* ── Headings ──────────────────────────────────────────────────────────────
    Applied as line decorations so the size, weight and (for h1/h2) the rule
@@ -346,6 +365,78 @@ html, body {
 /* ── Tables ──────────────────────────────────────────────────────────────── */
 .mlp-table-raw {
 	font-family: var(--vscode-editor-font-family, monospace);
+}
+/* A table, or frontmatter (see the ── Frontmatter ── section further down for
+   its *rendered* styling), switched to raw source via its own `</>` button
+   (see `isBlockRevealed` in cmUtils.ts) gets the same tinted-box treatment a
+   fenced code block already has — one continuous line background rather than
+   a mark's own text-width tint, so every "図" block's raw form reads as "this
+   is source" alike, whichever one it is. Grouped with the table rule here,
+   not down in that section, since the two are one shared rule. */
+.cm-line.mlp-line-table-raw,
+.cm-line.mlp-line-frontmatter-raw {
+	background: var(--vscode-textCodeBlock-background, rgba(127, 127, 127, 0.09));
+	padding-left: 1.1em;
+	padding-right: 1.1em;
+	/* Positioning root for the "back to rendered view" button on the first line. */
+	position: relative;
+}
+.cm-line.mlp-line-table-raw-first,
+.cm-line.mlp-line-frontmatter-raw-first {
+	border-top-left-radius: 6px;
+	border-top-right-radius: 6px;
+	padding-top: 0.5em;
+}
+.cm-line.mlp-line-table-raw-last,
+.cm-line.mlp-line-frontmatter-raw-last {
+	border-bottom-left-radius: 6px;
+	border-bottom-right-radius: 6px;
+	padding-bottom: 0.5em;
+}
+/* "Back to rendered view" button (`createRenderModeButton` in
+   codeModeButton.ts), shared by every "図" block's raw-source view — a table
+   (TableRenderButtonWidget), a diagram fence (DiagramRenderButtonWidget), and
+   frontmatter (FrontmatterRenderButtonWidget). Floated over the raw block's
+   first line — the same placement and zero-width host trick as
+   `.mlp-copy-code-host` on a fenced code block. */
+.mlp-render-mode-host {
+	position: absolute;
+	top: 2px;
+	right: 4px;
+	z-index: 2;
+}
+.mlp-render-mode-btn {
+	/* Same family as `.mlp-code-mode-btn` / `.mlp-copy-code-btn` — height,
+	   padding, face and size — so every block control reads as one set. */
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	height: 20px;
+	padding: 0 6px;
+	line-height: 1;
+	font-family: var(--vscode-editor-font-family, monospace);
+	font-size: 12px;
+	cursor: pointer;
+	/* Always present, only dimmed: unlike the "add row"/"add column" controls,
+	   this is the only route back to the rendered view once there is no
+	   rendered widget left to click — same reasoning as the `</>` button's own
+	   always-visible treatment. */
+	opacity: 0.55;
+	transition: opacity 0.12s ease, background-color 0.12s ease;
+	color: var(--vscode-descriptionForeground, var(--vscode-editor-foreground, #ccc));
+	background: var(--vscode-editor-background, #1e1e1e);
+	border: 1px solid var(--vscode-contrastBorder, rgba(127, 127, 127, 0.4));
+	border-radius: 4px;
+}
+.mlp-render-mode-btn:hover {
+	opacity: 1;
+	color: var(--vscode-button-secondaryForeground, var(--vscode-editor-foreground, #ccc));
+	background: var(--vscode-button-secondaryBackground, rgba(110, 110, 110, 0.4));
+}
+.mlp-render-mode-btn:focus-visible {
+	opacity: 1;
+	outline: 1px solid var(--vscode-focusBorder, #0078d4);
+	outline-offset: 1px;
 }
 /* Positioning root for the code-mode button, which is absolutely placed over
    the table's top-right corner. It carries no spacing of its own: that stays on

@@ -1,18 +1,10 @@
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, afterEach } from 'vitest';
 import { EditorState } from '@codemirror/state';
-import {
-	cursorTouchesRange,
-	blockCursorTouchesRange,
-	setPointerDownForTesting,
-	setSuppressForTesting,
-	allowRevealOnce,
-	noteRevealed,
-	clearRevealedForTesting,
-} from './cmUtils';
+import { cursorTouchesRange, inlineCursorTouchesRange, isBlockRevealed, setBlockRevealed, clearBlockRevealedForTesting } from './cmUtils';
 
 const DOC = 'above\n| a | b |\n|---|---|\n| 1 | 2 |\nbelow\n';
 
-/** Range of the table block in DOC (lines 2-4). */
+/** Range of the table block in DOC (lines 2-4) — used as a convenient, arbitrary span. */
 function tableRange(state: EditorState): { from: number; to: number } {
 	return { from: state.doc.line(2).from, to: state.doc.line(4).to };
 }
@@ -22,11 +14,6 @@ function stateWithSelection(anchor: number, head = anchor): EditorState {
 }
 
 describe('cursorTouchesRange', () => {
-	beforeEach(() => {
-		setPointerDownForTesting(false);
-		setSuppressForTesting(false);
-	});
-
 	it('is true for a caret on a line inside the range', () => {
 		const state = stateWithSelection(0);
 		const { from, to } = tableRange(state);
@@ -40,13 +27,9 @@ describe('cursorTouchesRange', () => {
 		expect(cursorTouchesRange(stateWithSelection(1), from, to)).toBe(false);
 	});
 
-	// Sweeping a selection across a rendered block is a copy gesture. Unrendering
-	// it mid-sweep replaces the rows being selected with raw pipe text and loses
-	// the selection the user was making.
-	// Inline constructs must give up their source to a drag-select: dragging
-	// across an image's `](url)` is how you select that URL, and it cannot be
-	// selected while it is hidden. Blocks keep the copy-sweep protection, but
-	// they get it from `blockCursorTouchesRange` (covered below), not here.
+	// Inline constructs give up their source to a drag-select: dragging across
+	// an image's `](url)` is how you select that URL, and it cannot be selected
+	// while it is hidden.
 	it('reveals for a selection that overlaps the range', () => {
 		const state = stateWithSelection(0);
 		const { from, to } = tableRange(state);
@@ -60,123 +43,72 @@ describe('cursorTouchesRange', () => {
 		// Ends exactly where the range starts: adjacency, not overlap.
 		expect(cursorTouchesRange(stateWithSelection(0, from), from, from + 4)).toBe(false);
 	});
+});
 
-	it('a sweep across a block still leaves the block rendered', () => {
-		// The guarantee that matters for the copy-sweep case, now enforced one
-		// level up.
-		const state = stateWithSelection(0);
-		const { from, to } = tableRange(state);
-		const head = state.doc.line(3).from + 2;
-		expect(blockCursorTouchesRange(stateWithSelection(0, head), from, to)).toBe(false);
+describe('inlineCursorTouchesRange', () => {
+	// A list item's marker ("- ", positions 0-2) sharing a line with the rest
+	// of the item's text — the shape that made `cursorTouchesRange`'s
+	// line-level check reveal a list item's raw "-" (or a bold run's "**")
+	// merely because the caret was elsewhere on the same line (regression).
+	const DOC_LIST = '- item one text\nnext\n';
+
+	it('is true for a caret exactly at the range (touching the marker itself)', () => {
+		expect(inlineCursorTouchesRange(stateWithSelection(0), 0, 1)).toBe(true); // at `from`
+		expect(inlineCursorTouchesRange(stateWithSelection(1), 0, 1)).toBe(true); // at `to`
 	});
 
-	// A blank line above a table resolves to document position 0, so pressing
-	// there and dragging down reads as a plain caret move whose head lands inside
-	// the table — indistinguishable from a click on it. Suppressing while the
-	// button is held is what keeps the block from flipping to source mid-gesture.
-	// The mouse-gesture guards live in `blockCursorTouchesRange`, not here.
-	// `cursorTouchesRange` also decides whether a heading shows its `#` and
-	// whether `**bold**` shows its asterisks; guarding it meant clicking a
-	// heading moved the caret but left the markup hidden, so the line could not
-	// be edited by mouse at all.
-	it('ignores the mouse-gesture guards, which are not its concern', () => {
-		const state = stateWithSelection(0);
-		const { from, to } = tableRange(state);
-		const inside = state.doc.line(3).from + 2;
-		setPointerDownForTesting(true);
-		setSuppressForTesting(true);
-		expect(cursorTouchesRange(stateWithSelection(inside), from, to)).toBe(true);
+	it('is false for a caret elsewhere on the same line (regression)', () => {
+		const state = EditorState.create({ doc: DOC_LIST, selection: { anchor: 10 } }); // inside "item one"
+		expect(inlineCursorTouchesRange(state, 0, 1)).toBe(false);
+	});
+
+	it('reveals for a selection that overlaps the range, like cursorTouchesRange', () => {
+		const state = EditorState.create({ doc: DOC_LIST, selection: { anchor: 0, head: 5 } });
+		expect(inlineCursorTouchesRange(state, 0, 1)).toBe(true);
+	});
+
+	it('ignores a selection that stops short of the range (adjacency, not overlap)', () => {
+		const state = EditorState.create({ doc: DOC_LIST, selection: { anchor: 1, head: 5 } });
+		expect(inlineCursorTouchesRange(state, 0, 1)).toBe(false);
 	});
 });
 
-describe('blockCursorTouchesRange', () => {
-	beforeEach(() => {
-		setPointerDownForTesting(false);
-		setSuppressForTesting(false);
-		clearRevealedForTesting();
+describe('isBlockRevealed / setBlockRevealed', () => {
+	// The whole point of this pair: a "図" block (table, diagram, frontmatter)
+	// switches only through its own button, never by where the caret is. So
+	// unlike `cursorTouchesRange`, this state takes no `EditorState` at all —
+	// it is plain module state, keyed on a block's start position alone (stable
+	// across an edit inside the block, unlike its end — see the comment above
+	// `revealedBlockStarts` in cmUtils.ts for the bug history that shaped this).
+	afterEach(() => {
+		clearBlockRevealedForTesting();
 	});
 
-	it('agrees with cursorTouchesRange when no gesture is in play', () => {
-		const state = stateWithSelection(0);
-		const { from, to } = tableRange(state);
-		const inside = state.doc.line(3).from + 2;
-		expect(blockCursorTouchesRange(stateWithSelection(inside), from, to)).toBe(true);
-		expect(blockCursorTouchesRange(stateWithSelection(1), from, to)).toBe(false);
+	it('is false for a position nothing has touched', () => {
+		expect(isBlockRevealed(42)).toBe(false);
 	});
 
-	// A blank line above a table resolves to document position 0, so pressing
-	// there and dragging down reads as a plain caret move whose head lands inside
-	// the table — indistinguishable from a click on it. Suppressing while the
-	// button is held keeps the block from flipping to source mid-gesture.
-	it('is false while a mouse gesture is in progress', () => {
-		const state = stateWithSelection(0);
-		const { from, to } = tableRange(state);
-		const inside = state.doc.line(3).from + 2;
-		setPointerDownForTesting(true);
-		expect(blockCursorTouchesRange(stateWithSelection(inside), from, to)).toBe(false);
+	it('becomes true once set, independent of any caret or selection', () => {
+		setBlockRevealed(42, true);
+		expect(isBlockRevealed(42)).toBe(true);
 	});
 
-	it('reveals the source again once the gesture ends', () => {
-		const state = stateWithSelection(0);
-		const { from, to } = tableRange(state);
-		const inside = state.doc.line(3).from + 2;
-		setPointerDownForTesting(true);
-		setPointerDownForTesting(false);
-		expect(blockCursorTouchesRange(stateWithSelection(inside), from, to)).toBe(true);
+	it('clears when set back to false', () => {
+		setBlockRevealed(42, true);
+		setBlockRevealed(42, false);
+		expect(isBlockRevealed(42)).toBe(false);
 	});
 
-	it('suppresses the reveal for a caret dragged into a block', () => {
-		const state = stateWithSelection(0);
-		const { from, to } = tableRange(state);
-		const inside = state.doc.line(3).from + 2;
-		setSuppressForTesting(true);
-		expect(blockCursorTouchesRange(stateWithSelection(inside), from, to)).toBe(false);
+	it('does not leak to a different block', () => {
+		setBlockRevealed(42, true);
+		expect(isBlockRevealed(43)).toBe(false);
 	});
 
-	// A block already showing its source must keep showing it whatever the mouse
-	// does. Applying the guards to one that is already open made it flip back to
-	// its rendered form for an instant on every click inside it — visible as the
-	// source flashing to a table while it was being edited.
-	it('keeps a block open once its source is already showing', () => {
-		const state = stateWithSelection(0);
-		const { from, to } = tableRange(state);
-		const inside = state.doc.line(3).from + 2;
-		noteRevealed(from, to, true);
-		setSuppressForTesting(true);
-		expect(blockCursorTouchesRange(stateWithSelection(inside), from, to)).toBe(true);
-		setPointerDownForTesting(true);
-		expect(blockCursorTouchesRange(stateWithSelection(inside), from, to)).toBe(true);
-	});
-
-	it('stops exempting a block once it is rendered again', () => {
-		const state = stateWithSelection(0);
-		const { from, to } = tableRange(state);
-		const inside = state.doc.line(3).from + 2;
-		noteRevealed(from, to, true);
-		noteRevealed(from, to, false);
-		setSuppressForTesting(true);
-		expect(blockCursorTouchesRange(stateWithSelection(inside), from, to)).toBe(false);
-	});
-
-	// The exemption must not leak to a block the caret is not in.
-	it('does not exempt a block whose range was never revealed', () => {
-		const state = stateWithSelection(0);
-		const { from, to } = tableRange(state);
-		const inside = state.doc.line(3).from + 2;
-		noteRevealed(from + 100, to + 100, true);
-		setSuppressForTesting(true);
-		expect(blockCursorTouchesRange(stateWithSelection(inside), from, to)).toBe(false);
-	});
-
-	// `allowRevealOnce` is the code-mode button's way past the suppression, since
-	// that button's press never reaches the block to clear the flag itself.
-	it('lets allowRevealOnce lift the suppression', () => {
-		const state = stateWithSelection(0);
-		const { from, to } = tableRange(state);
-		const inside = state.doc.line(3).from + 2;
-		setSuppressForTesting(true);
-		expect(blockCursorTouchesRange(stateWithSelection(inside), from, to)).toBe(false);
-		allowRevealOnce();
-		expect(blockCursorTouchesRange(stateWithSelection(inside), from, to)).toBe(true);
+	it('clearBlockRevealedForTesting clears every block at once', () => {
+		setBlockRevealed(1, true);
+		setBlockRevealed(2, true);
+		clearBlockRevealedForTesting();
+		expect(isBlockRevealed(1)).toBe(false);
+		expect(isBlockRevealed(2)).toBe(false);
 	});
 });

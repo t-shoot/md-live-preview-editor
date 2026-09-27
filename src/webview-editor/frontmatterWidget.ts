@@ -1,7 +1,8 @@
 import type { EditorState } from '@codemirror/state';
 import { EditorView, WidgetType } from '@codemirror/view';
 import { wrapBlockWidget } from './blockWidgetWrap';
-import { withCodeModeButton } from './codeModeButton';
+import { withCodeModeButton, createRenderModeButton } from './codeModeButton';
+import { setBlockRevealed, blockRevealChanged } from './cmUtils';
 import { t } from '../shared/i18n';
 
 export interface FrontmatterRange {
@@ -44,20 +45,17 @@ function formatValue(value: unknown): string {
 	return JSON.stringify(value, null, 2);
 }
 
-function jumpToRange(view: EditorView, el: HTMLElement): void {
-	const pos = view.posAtDOM(el);
-	view.dispatch({ selection: { anchor: pos }, scrollIntoView: true });
-	view.focus();
-}
-
 /** Renders a parsed frontmatter (1+ entries) as a key/value table. */
 export class FrontmatterWidget extends WidgetType {
-	constructor(private readonly entries: Array<[string, unknown]>) {
+	constructor(
+		private readonly entries: Array<[string, unknown]>,
+		private readonly blockFrom: number,
+	) {
 		super();
 	}
 
 	eq(other: FrontmatterWidget): boolean {
-		return JSON.stringify(other.entries) === JSON.stringify(this.entries);
+		return other.blockFrom === this.blockFrom && JSON.stringify(other.entries) === JSON.stringify(this.entries);
 	}
 
 	toDOM(view: EditorView): HTMLElement {
@@ -81,17 +79,20 @@ export class FrontmatterWidget extends WidgetType {
 			tbody.appendChild(tr);
 		}
 		table.appendChild(tbody);
-		table.addEventListener('mousedown', (event) => {
-			event.preventDefault();
-			jumpToRange(view, table);
-		});
-		// Clicking the block already reveals the source; the button makes that
-		// route visible, and matches the one every other rendered block carries.
-		return wrapBlockWidget(withCodeModeButton(view, table, { anchor: table }));
+		// The `</>` button is the only way in — a "図" block, so nothing about a
+		// plain click on it should move the caret or change what's shown (see
+		// `isBlockRevealed` in cmUtils.ts). `ignoreEvent` below leaves such a click
+		// with nothing to do, the same as clicking a Mermaid diagram.
+		return wrapBlockWidget(
+			withCodeModeButton(view, table, {
+				anchor: table,
+				onReveal: () => setBlockRevealed(this.blockFrom, true),
+			}),
+		);
 	}
 
 	ignoreEvent(): boolean {
-		return false;
+		return true;
 	}
 }
 
@@ -114,12 +115,15 @@ export class FrontmatterEmptyWidget extends WidgetType {
 
 /** Renders a YAML parse failure in place of the table. */
 export class FrontmatterErrorWidget extends WidgetType {
-	constructor(private readonly message: string) {
+	constructor(
+		private readonly message: string,
+		private readonly blockFrom: number,
+	) {
 		super();
 	}
 
 	eq(other: FrontmatterErrorWidget): boolean {
-		return other.message === this.message;
+		return other.blockFrom === this.blockFrom && other.message === this.message;
 	}
 
 	toDOM(view: EditorView): HTMLElement {
@@ -131,16 +135,82 @@ export class FrontmatterErrorWidget extends WidgetType {
 		const pre = document.createElement('pre');
 		pre.textContent = this.message;
 		container.append(strong, pre);
-		container.addEventListener('mousedown', (event) => {
-			event.preventDefault();
-			jumpToRange(view, container);
-		});
 		// A parse error is exactly when the source needs reaching, so the button
-		// matters most here.
-		return wrapBlockWidget(withCodeModeButton(view, container, { anchor: container }));
+		// matters most here — still the only way in, same as the table above.
+		return wrapBlockWidget(
+			withCodeModeButton(view, container, {
+				anchor: container,
+				onReveal: () => setBlockRevealed(this.blockFrom, true),
+			}),
+		);
 	}
 
 	ignoreEvent(): boolean {
-		return false;
+		return true;
+	}
+}
+
+/**
+ * Where the caret should land once frontmatter switches back to its rendered
+ * view, re-derived from the *current* document rather than the position
+ * remembered when `FrontmatterRenderButtonWidget` was built — the YAML can
+ * have been edited (and so shrunk or grown) in the meantime.
+ *
+ * When frontmatter runs all the way to the end of the document, there is no
+ * line after it to land on; `insert` then adds one to land on instead, the
+ * same fallback `TableRenderButtonWidget` uses for a table in the same spot.
+ */
+function frontmatterRenderTarget(
+	state: EditorState,
+	blockFrom: number,
+): { anchor: number; insert?: string } {
+	const doc = state.doc;
+	const current = detectFrontmatter(state);
+	const to = current?.to ?? blockFrom;
+	const lastLine = doc.lineAt(Math.min(to, doc.length));
+	if (lastLine.number < doc.lines) {
+		return { anchor: doc.line(lastLine.number + 1).from };
+	}
+	return { anchor: doc.length + 1, insert: '\n' };
+}
+
+/**
+ * Floats the "back to rendered view" button over frontmatter's raw YAML,
+ * anchored to its first line — the same placement `TableRenderButtonWidget`
+ * and `CopyCodeWidget` use for their own first line.
+ */
+export class FrontmatterRenderButtonWidget extends WidgetType {
+	constructor(private readonly blockFrom: number) {
+		super();
+	}
+	eq(other: FrontmatterRenderButtonWidget): boolean {
+		return other.blockFrom === this.blockFrom;
+	}
+	toDOM(view: EditorView): HTMLElement {
+		const host = document.createElement('span');
+		host.className = 'mlp-render-mode-host';
+		host.appendChild(
+			createRenderModeButton(() => {
+				setBlockRevealed(this.blockFrom, false);
+				const { anchor, insert } = frontmatterRenderTarget(view.state, this.blockFrom);
+				view.dispatch(
+					insert === undefined
+						? { selection: { anchor }, effects: blockRevealChanged.of(null), scrollIntoView: true }
+						: {
+								changes: { from: view.state.doc.length, insert },
+								selection: { anchor },
+								effects: blockRevealChanged.of(null),
+								scrollIntoView: true,
+							},
+				);
+			}),
+		);
+		return host;
+	}
+	get estimatedHeight(): number {
+		return 0;
+	}
+	ignoreEvent(): boolean {
+		return true;
 	}
 }

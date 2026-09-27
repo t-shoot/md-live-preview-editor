@@ -42,6 +42,9 @@ const en = {
 	'table.addRow': 'Add a row',
 	'table.addColumn': 'Add a column',
 
+	'render.toggle.title': 'Render mode: show this as its rendered view again',
+	'render.toggle.aria': 'Switch back to rendered view',
+
 	'outline.empty': 'No headings.',
 	'outline.untitled': '(untitled heading)',
 	'outline.noDocument': 'Open a Markdown Live Preview document to see its headings here.',
@@ -148,6 +151,9 @@ const ja: Record<MessageKey, string> = {
 
 	'table.addRow': '行を追加',
 	'table.addColumn': '列を追加',
+
+	'render.toggle.title': 'レンダリングモード：表示済みの見た目に戻します',
+	'render.toggle.aria': '表示済みの見た目に戻す',
 
 	'outline.empty': '見出しがありません。',
 	'outline.untitled': '(無題の見出し)',

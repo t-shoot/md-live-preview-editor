@@ -2,14 +2,14 @@ import { EditorView, ViewPlugin, ViewUpdate, Decoration, DecorationSet, WidgetTy
 import { syntaxTree } from '@codemirror/language';
 import type { Range, EditorState } from '@codemirror/state';
 import type { SyntaxNode, SyntaxNodeRef } from '@lezer/common';
-import { cursorTouchesRange, blockCursorTouchesRange, noteRevealed } from './cmUtils';
+import { cursorTouchesRange, inlineCursorTouchesRange, isBlockRevealed, setBlockRevealed, blockRevealChanged } from './cmUtils';
 import { isDiagramLang } from './diagramLang';
 import { isDrawioPath } from './drawioFileClient';
 import { DrawioFileWidget } from './drawioWidget';
 import { wrapBlockWidget } from './blockWidgetWrap';
-import { detectFrontmatter } from './frontmatterWidget';
+import { detectFrontmatter, FrontmatterRenderButtonWidget } from './frontmatterWidget';
 import { renderInlineInto, type CellInlineHooks } from './tableCellInline';
-import { createCodeModeButton, createCopyCodeButton } from './codeModeButton';
+import { createCodeModeButton, createCopyCodeButton, createRenderModeButton } from './codeModeButton';
 import { insertRow, insertColumn, renderTableMarkdown, type TableEditModel } from './tableEdit';
 import { t } from '../shared/i18n';
 
@@ -163,6 +163,19 @@ class BulletWidget extends WidgetType {
 		span.textContent = '•';
 		return span;
 	}
+	/**
+	 * Let a press on the bullet start a selection, the same fix `ImageWidget`
+	 * needs and for the same reason.
+	 *
+	 * `WidgetType.ignoreEvent` defaults to ignoring everything, which meant a
+	 * mousedown landing on the "•" itself — the natural place to grab when
+	 * dragging out a list item's text — never registered as a document
+	 * interaction. CodeMirror's own drag-selection tracking never started, so
+	 * the gesture produced no visible selection at all.
+	 */
+	ignoreEvent(): boolean {
+		return false;
+	}
 }
 
 class CheckboxWidget extends WidgetType {
@@ -246,6 +259,121 @@ class CopyCodeWidget extends WidgetType {
 		// widget is built, and the offsets are re-derived on every rebuild.
 		host.appendChild(
 			createCopyCodeButton(() => view.state.sliceDoc(Math.min(this.from, view.state.doc.length), Math.min(this.to, view.state.doc.length))),
+		);
+		return host;
+	}
+	get estimatedHeight(): number {
+		return 0;
+	}
+	ignoreEvent(): boolean {
+		return true;
+	}
+}
+
+/**
+ * Floats a "render as table" button over a raw table's top-right corner.
+ *
+ * A rendered table's own `</>` button (see `createCodeModeButton` in
+ * TableWidget) is the only way to *reach* its raw pipe syntax, since clicking
+ * a rendered cell edits it in place rather than revealing the source. Once
+ * there, this is the only way *back* — this "図" block switches only through
+ * its own buttons (see `isBlockRevealed` in cmUtils.ts), never by the caret
+ * moving off its lines.
+ *
+ * Positioned exactly like `CopyCodeWidget`: a zero-width widget anchored at
+ * the start of the table's first line, riding along with it.
+ */
+class TableRenderButtonWidget extends WidgetType {
+	constructor(private readonly tableFrom: number) {
+		super();
+	}
+	eq(other: TableRenderButtonWidget): boolean {
+		return other.tableFrom === this.tableFrom;
+	}
+	toDOM(view: EditorView): HTMLElement {
+		const host = document.createElement('span');
+		host.className = 'mlp-render-mode-host';
+		host.appendChild(
+			createRenderModeButton(() => {
+				setBlockRevealed(this.tableFrom, false);
+				const doc = view.state.doc;
+				const from = Math.min(this.tableFrom, doc.length);
+				const anchor = caretPastTable(view.state, from, 0);
+				if (anchor !== null) {
+					view.dispatch({ selection: { anchor }, effects: blockRevealChanged.of(null), scrollIntoView: true });
+					return;
+				}
+				// The table runs to the very end of the document, so there is no line
+				// after it to land the caret on — make one. A trailing blank line is
+				// an ordinary, harmless thing for a Markdown file to end with.
+				const end = doc.length;
+				view.dispatch({
+					changes: { from: end, insert: '\n' },
+					selection: { anchor: end + 1 },
+					effects: blockRevealChanged.of(null),
+					scrollIntoView: true,
+				});
+			}),
+		);
+		return host;
+	}
+	get estimatedHeight(): number {
+		return 0;
+	}
+	ignoreEvent(): boolean {
+		return true;
+	}
+}
+
+/**
+ * Floats a "render as diagram" button over a raw Mermaid/draw.io fence's
+ * top-right corner — the diagram counterpart of `TableRenderButtonWidget`,
+ * for exactly the same reason: a diagram is a "図" block, so the way back to
+ * its rendered form is this button alone, never the caret moving away.
+ *
+ * The fence's own end is re-found via the syntax tree at click time rather
+ * than trusted from whenever this widget was built: the raw text can have
+ * been edited (a line added or removed) since, which would move it.
+ */
+class DiagramRenderButtonWidget extends WidgetType {
+	constructor(private readonly blockFrom: number) {
+		super();
+	}
+	eq(other: DiagramRenderButtonWidget): boolean {
+		return other.blockFrom === this.blockFrom;
+	}
+	toDOM(view: EditorView): HTMLElement {
+		const host = document.createElement('span');
+		host.className = 'mlp-render-mode-host';
+		host.appendChild(
+			createRenderModeButton(() => {
+				setBlockRevealed(this.blockFrom, false);
+				const state = view.state;
+				const doc = state.doc;
+				let found: SyntaxNode | null = null;
+				syntaxTree(state).iterate({
+					from: Math.min(this.blockFrom, doc.length),
+					to: Math.min(this.blockFrom + 1, doc.length),
+					enter(node) {
+						if (!found && node.name === 'FencedCode') found = node.node;
+					},
+				});
+				const blockTo = found ? (found as SyntaxNode).to : this.blockFrom;
+				const lastLine = doc.lineAt(Math.min(blockTo, doc.length));
+				if (lastLine.number < doc.lines) {
+					const anchor = doc.line(lastLine.number + 1).from;
+					view.dispatch({ selection: { anchor }, effects: blockRevealChanged.of(null), scrollIntoView: true });
+					return;
+				}
+				// The fence runs to the very end of the document — make a line to land on.
+				const end = doc.length;
+				view.dispatch({
+					changes: { from: end, insert: '\n' },
+					selection: { anchor: end + 1 },
+					effects: blockRevealChanged.of(null),
+					scrollIntoView: true,
+				});
+			}),
 		);
 		return host;
 	}
@@ -421,7 +549,11 @@ class TableWidget extends WidgetType {
 				// A newline cannot live inside a cell, so Enter means "done".
 				event.preventDefault();
 				commit(editing);
-				view.focus();
+				// Deliberately not `view.focus()`: that would show a caret blinking
+				// in the document at wherever `commit` parked the selection, which
+				// reads as "editing resumed somewhere else" when nothing was asked
+				// for beyond leaving this cell. Table navigation (Tab, clicking
+				// another cell) already leaves the document unfocused the same way.
 				return;
 			}
 			if (event.key === 'Escape') {
@@ -430,7 +562,6 @@ class TableWidget extends WidgetType {
 				// edit is discarded rather than written back.
 				editing.textContent = ref.source;
 				commit(editing);
-				view.focus();
 			}
 		}
 
@@ -464,11 +595,23 @@ class TableWidget extends WidgetType {
 			if (!ref) return null;
 			const next = sanitizeCellInput(cell.textContent ?? '');
 			if (next === ref.source) {
-				// Unchanged: re-render in place. Skipping the dispatch avoids pushing
-				// a no-op onto the undo history, but the DOM currently holds the raw
-				// source text, so it still has to be restored.
+				// Unchanged: re-render in place. Skipping a `changes` dispatch avoids
+				// pushing a no-op onto the undo history, but the DOM currently holds
+				// the raw source text, so it still has to be restored.
 				cell.textContent = '';
 				renderInlineInto(cell, ref.source, cellInlineHooks);
+				// The document caret is still parked at `ref.from` from
+				// `beginEditing` — a position *inside* the table's block-replaced
+				// range. That's harmless while the cell keeps native focus, but
+				// Escape and Enter call `view.focus()` right after committing, which
+				// asks CodeMirror to show a real caret at that position — one with no
+				// coordinates inside a widget, which rendered as a stray caret past
+				// the table's own right edge (the reported bug). A selection-only
+				// dispatch carries no undo-history entry of its own, so relocating it
+				// here — same target `caretPastTable` already sends a real edit's
+				// caret to — is free.
+				const anchor = caretPastTable(view.state, ref.from, 0);
+				if (anchor !== null) view.dispatch({ selection: { anchor } });
 				return ref.to;
 			}
 			// The span was read from the document as it stood when this widget was
@@ -562,9 +705,10 @@ class TableWidget extends WidgetType {
 			// typing — the contenteditable cell below handles that — but it has to
 			// go *somewhere*, and wherever it was left is a line whose inline markup
 			// then shows its source: clicking a table cell would reveal the `#` on a
-			// heading elsewhere in the document. The table's own line is safe,
-			// because this widget is exempt from that reveal while a cell is being
-			// edited (see `blockCursorTouchesRange`).
+			// heading elsewhere in the document. The table's own line is safe for
+			// this: unlike a heading or bold text, this "図" block does not care
+			// where the caret is at all — it only ever shows raw source when its own
+			// `</>` button was clicked (see `isBlockRevealed` in cmUtils.ts).
 			if (ref.from <= view.state.doc.length) {
 				view.dispatch({ selection: { anchor: ref.from } });
 			}
@@ -635,6 +779,7 @@ class TableWidget extends WidgetType {
 		toolbar.appendChild(
 			createCodeModeButton(view, {
 				anchor: table,
+				onReveal: () => setBlockRevealed(this.tableFrom, true),
 				// Save any half-finished cell edit first; `commit` reports where that
 				// cell's text ended up, which already accounts for the edit's own change
 				// in length.
@@ -686,6 +831,23 @@ class TableWidget extends WidgetType {
 				// select a word or paragraph of the *rendered* text, which is about to
 				// be replaced by the cell's raw Markdown anyway. Suppressing it keeps
 				// repeated clicking from looking like a drag-select.
+				event.preventDefault();
+			}
+			if (editing && editing !== cell) {
+				// Switching cells while one is already being edited. `stopPropagation`
+				// below keeps CodeMirror from treating the press as a document click,
+				// but it does not cancel the browser's *own* default action for a
+				// mousedown that moves focus — and with `editing` (a contentEditable
+				// cell) about to lose focus while this new cell isn't contentEditable
+				// yet, the browser's default landed that focus on `.cm-content`
+				// instead, at whatever raw-text position the click's coordinates
+				// happened to map to. It showed as the caret flashing somewhere in the
+				// document for the press's duration, then disappearing once `mouseup`
+				// ran `beginEditing` and refocused the new cell. Preventing default
+				// only in this case — not for every press — keeps dragging across
+				// cells to select-and-copy their rendered text intact (see the
+				// `mouseup` handler below), since that gesture never starts while
+				// another cell is mid-edit.
 				event.preventDefault();
 			}
 			// Keep the press away from CodeMirror's own handler, which would otherwise
@@ -1118,7 +1280,7 @@ export function blockReplacedLines(state: EditorState, item: SyntaxNode): Set<nu
 	const lines = new Set<number>();
 	for (let child = item.firstChild; child; child = child.nextSibling) {
 		if (child.name !== 'Table') continue;
-		if (blockCursorTouchesRange(state, child.from, child.to)) continue;
+		if (isBlockRevealed(state.doc.lineAt(child.from).from)) continue;
 		const range = alignedBlockRange(state, child.from, child.to);
 		if (!range) continue;
 		const first = state.doc.lineAt(range.from).number;
@@ -1177,6 +1339,22 @@ function buildDecorations(view: EditorView): DecorationSet {
 		}
 	};
 
+	if (fm && isBlockRevealed(fm.from)) {
+		// The way back to the rendered frontmatter — same reasoning as
+		// `TableRenderButtonWidget`: a "図" block switches only through its own
+		// buttons, never by the caret moving off its lines.
+		decorations.push(Decoration.widget({ widget: new FrontmatterRenderButtonWidget(fm.from), side: -1 }).range(fm.from));
+		// Same tinted-box treatment raw table/diagram source gets — this is a
+		// "図" block too, so its raw YAML should read as source, not as a
+		// document that lost its frontmatter formatting.
+		addLineRange(fm.from, fm.to, (_n, first, last) => {
+			let cls = 'mlp-line-frontmatter-raw';
+			if (first) cls += ' mlp-line-frontmatter-raw-first';
+			if (last) cls += ' mlp-line-frontmatter-raw-last';
+			return cls;
+		});
+	}
+
 	for (const { from: rangeFrom, to: rangeTo } of view.visibleRanges) {
 		tree.iterate({
 			from: rangeFrom,
@@ -1215,7 +1393,6 @@ function buildDecorations(view: EditorView): DecorationSet {
 						return;
 					}
 					case 'QuoteMark':
-					case 'CodeMark':
 					case 'CodeInfo': {
 						if (!cursorTouchesRange(state, node.from, node.to)) {
 							// Also swallow the single space after the marker so hidden markers
@@ -1226,9 +1403,46 @@ function buildDecorations(view: EditorView): DecorationSet {
 						}
 						return;
 					}
+					case 'CodeMark': {
+						// `CodeMark` names both a fenced code block's ```` ``` ```` fence
+						// (the whole line, nothing else on it — line-based touch is exactly
+						// "is the caret on this line") and an inline code span's own
+						// backtick (which, like emphasis, routinely shares its line with
+						// unrelated text). Only the fence wants `cursorTouchesRange`;
+						// treating an inline backtick the same way is the same bug bold and
+						// list markers had — editing the far end of a sentence revealed a
+						// `` `code` `` span's backticks just because it was on the same line.
+						const enclosing = node.node.parent;
+						if (enclosing?.name === 'InlineCode') {
+							if (!inlineCursorTouchesRange(state, enclosing.from, enclosing.to)) {
+								const next = state.sliceDoc(node.to, node.to + 1);
+								const to = next === ' ' ? node.to + 1 : node.to;
+								pushReplace(node.from, to, hiddenMarkerDeco);
+							}
+							return;
+						}
+						if (!cursorTouchesRange(state, node.from, node.to)) {
+							const next = state.sliceDoc(node.to, node.to + 1);
+							const to = next === ' ' ? node.to + 1 : node.to;
+							pushReplace(node.from, to, hiddenMarkerDeco);
+						}
+						return;
+					}
 					case 'EmphasisMark':
 					case 'StrikethroughMark': {
-						if (!cursorTouchesRange(state, node.from, node.to)) {
+						// Touch is checked against the *enclosing* Emphasis/StrongEmphasis/
+						// Strikethrough span, not this mark's own narrow range — so a caret
+						// anywhere inside "**bold**" reveals both its markers together,
+						// rather than only the one the caret happens to sit next to (which
+						// would flicker one marker hidden while the other stays visible as
+						// the caret moves through the content between them). See
+						// `inlineCursorTouchesRange` for why this can't reuse the same
+						// whole-line check a heading's "#" does: unlike a heading, this run
+						// usually shares its line with unrelated text.
+						const enclosing = node.node.parent;
+						const from = enclosing ? enclosing.from : node.from;
+						const to = enclosing ? enclosing.to : node.to;
+						if (!inlineCursorTouchesRange(state, from, to)) {
 							pushReplace(node.from, node.to, hiddenMarkerDeco);
 						}
 						return;
@@ -1316,17 +1530,23 @@ function buildDecorations(view: EditorView): DecorationSet {
 						});
 						return; // descend to hide the ">" marks
 					case 'ListMark': {
+						// Checked against this marker's own range, not the whole line: a
+						// list item's text can run long, and a caret editing that text
+						// elsewhere on the line is not a request to see the item's raw
+						// `-`/`1.` — only a caret actually at or beside the marker is. See
+						// `inlineCursorTouchesRange`.
 						if (listItemIsTask(state, node)) {
 							// Task items render a checkbox from the TaskMarker; drop the bullet.
-							if (!cursorTouchesRange(state, node.from, node.to)) {
-								const next = state.sliceDoc(node.to, node.to + 1);
-								pushReplace(node.from, next === ' ' ? node.to + 1 : node.to, hiddenMarkerDeco);
+							const next = state.sliceDoc(node.to, node.to + 1);
+							const to = next === ' ' ? node.to + 1 : node.to;
+							if (!inlineCursorTouchesRange(state, node.from, to)) {
+								pushReplace(node.from, to, hiddenMarkerDeco);
 							}
 							return;
 						}
 						const markText = state.sliceDoc(node.from, node.to);
 						if (/^[-*+]$/.test(markText)) {
-							if (!cursorTouchesRange(state, node.from, node.to)) {
+							if (!inlineCursorTouchesRange(state, node.from, node.to)) {
 								pushReplace(node.from, node.to, Decoration.replace({ widget: new BulletWidget() }));
 							} else {
 								decorations.push(Decoration.mark({ class: 'mlp-list-mark' }).range(node.from, node.to));
@@ -1338,7 +1558,7 @@ function buildDecorations(view: EditorView): DecorationSet {
 						return;
 					}
 					case 'TaskMarker': {
-						if (!cursorTouchesRange(state, node.from, node.to)) {
+						if (!inlineCursorTouchesRange(state, node.from, node.to)) {
 							const checked = /[xX]/.test(state.sliceDoc(node.from, node.to));
 							pushReplace(node.from, node.to, Decoration.replace({ widget: new CheckboxWidget(checked, node.from) }));
 						}
@@ -1350,16 +1570,24 @@ function buildDecorations(view: EditorView): DecorationSet {
 					case 'FencedCode': {
 						const infoNode = node.node.getChild('CodeInfo');
 						const lang = infoNode ? state.sliceDoc(infoNode.from, infoNode.to).trim().toLowerCase() : '';
+						const isDiagram = isDiagramLang(lang) !== null;
+						const diagramBlockFrom = doc.lineAt(node.from).from;
 						// Must use the same test blockDecorationsField uses to decide
 						// whether the diagram renders — if the two disagree, either the
 						// widget is dropped or the fence is styled as code underneath it.
-						if (
-							isDiagramLang(lang) !== null &&
-							!blockCursorTouchesRange(state, node.from, node.to) &&
-							isLineAligned(state, node.from, node.to)
-						) {
+						if (isDiagram && !isBlockRevealed(diagramBlockFrom) && isLineAligned(state, node.from, node.to)) {
 							// Rendered as a diagram by blockDecorationsField; skip entirely.
 							return false;
+						}
+						if (isDiagram && isBlockRevealed(diagramBlockFrom)) {
+							// The way back to the rendered diagram — a "図" block switches
+							// only through its own buttons (see `isBlockRevealed` in
+							// cmUtils.ts), never by the caret moving off its lines.
+							decorations.push(
+								Decoration.widget({ widget: new DiagramRenderButtonWidget(diagramBlockFrom), side: -1 }).range(
+									node.from,
+								),
+							);
 						}
 						const cursorAway = !cursorTouchesRange(state, node.from, node.to);
 						const firstLineNum = doc.lineAt(node.from).number;
@@ -1432,14 +1660,14 @@ function buildDecorations(view: EditorView): DecorationSet {
 							// diagram widget (which reads the file through the host)
 							// instead. `.drawio.svg`/`.drawio.png` deliberately do not —
 							// those are real images that an <img> already shows correctly.
-							const widget = isDrawioPath(src) ? new DrawioFileWidget(src, alt) : new ImageWidget(src, alt);
+							const widget = isDrawioPath(src) ? new DrawioFileWidget(src, alt, node.from) : new ImageWidget(src, alt);
 							pushReplace(node.from, node.to, Decoration.replace({ widget }));
 						}
 						return false;
 					}
 					case 'Table': {
-						const tableRevealed = blockCursorTouchesRange(state, node.from, node.to);
-						noteRevealed(node.from, node.to, tableRevealed);
+						const tableFirstLine = doc.lineAt(node.from).from;
+						const tableRevealed = isBlockRevealed(tableFirstLine);
 						if (!tableRevealed && alignedBlockRange(state, node.from, node.to)) {
 							// Rendered as a rich table by blockDecorationsField. Block
 							// decorations may not be supplied from a view plugin, so emit
@@ -1447,6 +1675,24 @@ function buildDecorations(view: EditorView): DecorationSet {
 							return false;
 						}
 						decorations.push(Decoration.mark({ class: 'mlp-table-raw' }).range(node.from, node.to));
+						// Line backgrounds, the same tinted-box treatment a fenced code
+						// block gets — the raw pipe syntax reads as "you are editing
+						// source" rather than looking like a table that broke.
+						addLineRange(node.from, node.to, (_n, first, last) => {
+							let cls = 'mlp-line-table-raw';
+							if (first) cls += ' mlp-line-table-raw-first';
+							if (last) cls += ' mlp-line-table-raw-last';
+							return cls;
+						});
+						// The way back to the rendered table — clicking a cell can't be
+						// it (there is no rendered cell to click), so it needs its own
+						// control, floated over the first line the same way the copy
+						// button rides a code block's first content line.
+						decorations.push(
+							Decoration.widget({ widget: new TableRenderButtonWidget(tableFirstLine), side: -1 }).range(
+								tableFirstLine,
+							),
+						);
 						return;
 					}
 				}
@@ -1470,7 +1716,17 @@ export const livePreviewPlugin = ViewPlugin.fromClass(
 		}
 
 		update(update: ViewUpdate) {
-			if (update.docChanged || update.viewportChanged || update.selectionSet) {
+			if (
+				update.docChanged ||
+				update.viewportChanged ||
+				update.selectionSet ||
+				// A "図" block's own button flipped `isBlockRevealed` (cmUtils.ts) —
+				// plain module state, invisible to this plugin unless a transaction
+				// says so. Selection also changes on the same dispatch in every
+				// current caller, so this mostly guards against a future one that
+				// doesn't; cheap enough to check unconditionally.
+				update.transactions.some((tr) => tr.effects.some((e) => e.is(blockRevealChanged)))
+			) {
 				this.decorations = buildDecorations(update.view);
 			}
 		}
