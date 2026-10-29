@@ -5,6 +5,26 @@
 All notable changes to this extension are documented here.
 This project follows [Semantic Versioning](https://semver.org/).
 
+## [0.5.0] — 2026-10-29
+
+### Added
+
+- Fold heading sections, including nested headings, using compact square controls. Expand a folded section with its ellipsis button. Search and outline navigation reveal folded content.
+- Code blocks share one horizontal scrollbar below all their lines. Scrolling preserves editing, copying, and the horizontal position after edits.
+
+### Changed
+
+- The reading area fills wide editor panes with responsive side margins.
+- Translucent controls use a more uniform surface with less reflective glare. Table spacing and header borders are more consistent.
+- The document metadata section is now labeled “Front matter”.
+
+### Fixed
+
+- Clicking another table cell starts editing with one click, including after keyboard navigation.
+- Backspace immediately below a rendered table moves the caret above it while preserving required Markdown separators.
+- Code scrollbar backgrounds refresh when the CSS theme changes.
+- Development launches use isolated settings and extensions to avoid conflicts with installed copies.
+
 ## [0.4.0] — 2026-10-19
 
 ### Added
@@ -329,6 +349,26 @@ callouts and export are still missing.
 
 この拡張機能の主な変更点をまとめています。
 バージョン番号は [セマンティック バージョニング](https://semver.org/lang/ja/) に従っています。
+
+## [0.5.0] — 2026-10-29
+
+### 追加
+
+- 見出し左の小さな正方形ボタンで、本文と下位の見出しを折りたためます。「…」ボタンで開けます。検索やアウトラインからの移動時も、対象の本文が開きます。
+- コードブロックの下に、全行をまとめて動かす横スクロールバーを追加しました。横に動かした後も編集とコピーができ、編集後も横の表示位置を保ちます。
+
+### 変更
+
+- 本文の幅を画面に合わせて広げ、左右の余白を調整しました。
+- 半透明の操作ボタンの光沢を抑えました。表上部の余白と見出しセルの罫線も整えました。
+- 「文書情報」の表示名を「フロントマター」に変更しました。
+
+### 修正
+
+- 表の編集中に別のセルを1回クリックすると、そのセルを編集できるようにしました。キーボード移動後のクリックも改善しました。
+- 表のすぐ下でBackspaceを押したとき、必要な改行を保ちながらカーソルを表の上へ移すようにしました。
+- CSSテーマの変更時に、コードの横スクロールバーの背景色も更新するようにしました。
+- 開発用の起動では、設定と拡張機能の保存先を分け、インストール済みの拡張との競合を避けるようにしました。
 
 ## [0.4.0] — 2026-10-19
 
