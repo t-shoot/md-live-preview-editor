@@ -6,7 +6,10 @@
 			"type": "extensionHost",
 			"request": "launch",
 			"args": [
-				"--extensionDevelopmentPath=${workspaceFolder}"
+				"--extensionDevelopmentPath=${workspaceFolder}",
+				"--disable-extensions",
+				"--user-data-dir=${workspaceFolder}/.vscode-test/dev-user",
+				"--extensions-dir=${workspaceFolder}/.vscode-test/dev-extensions"
 			],
 			"outFiles": [
 				"${workspaceFolder}/dist/**/*.js"

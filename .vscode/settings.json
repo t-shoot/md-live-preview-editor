@@ -1,0 +1,4 @@
+{
+	// Avoid Node's network-inspection errors while debugging the extension host.
+	"debug.javascript.enableNetworkView": false
+}
