@@ -9,15 +9,15 @@
 	--mlp-ui-active-ink: var(--vscode-list-inactiveSelectionForeground, var(--mlp-ui-ink));
 	--mlp-ui-edge: var(--vscode-editorWidget-border, var(--vscode-panel-border, color-mix(in srgb, var(--mlp-ui-ink) 20%, transparent)));
 	--mlp-ui-light: var(--mlp-ui-ink);
-	--mlp-ui-rim: color-mix(in srgb, var(--mlp-ui-light) 48%, var(--mlp-ui-edge));
-	--mlp-ui-side-rim: color-mix(in srgb, var(--mlp-ui-light) 24%, var(--mlp-ui-edge));
+	--mlp-ui-rim: var(--mlp-ui-edge);
+	--mlp-ui-side-rim: var(--mlp-ui-edge);
 	--mlp-ui-reflection: color-mix(in srgb, var(--mlp-ui-light) 15%, transparent);
 	--mlp-ui-glint: color-mix(in srgb, var(--mlp-ui-light) 7%, transparent);
 	--mlp-ui-base: var(--vscode-editorWidget-background, var(--vscode-editor-background, Canvas));
-	/* Keep the middle clear; light collects at the curved perimeter. */
-	--mlp-ui-glass: radial-gradient(ellipse at 0% 0%, var(--mlp-ui-reflection), transparent 58%), linear-gradient(145deg, var(--mlp-ui-reflection), transparent 32%, transparent 68%, var(--mlp-ui-glint)), color-mix(in srgb, var(--mlp-ui-base) 58%, transparent);
+	/* A uniform translucent surface, without a bright upper-left reflection. */
+	--mlp-ui-glass: color-mix(in srgb, var(--mlp-ui-base) 58%, transparent);
 	--mlp-ui-shadow-color: var(--vscode-widget-shadow, color-mix(in srgb, var(--vscode-editor-background, Canvas) 35%, transparent));
-	--mlp-ui-control-shadow: inset 0 1px 0 var(--mlp-ui-reflection), inset 0 -1px 0 var(--mlp-ui-glint), inset 0 0 0 1px var(--mlp-ui-glint);
+	--mlp-ui-control-shadow: inset 0 0 0 1px var(--mlp-ui-glint);
 	--mlp-ui-shadow: 0 10px 28px var(--mlp-ui-shadow-color), 0 2px 5px var(--mlp-ui-shadow-color), var(--mlp-ui-control-shadow);
 	--mlp-ui-blur: blur(12px) saturate(1.35);
 	--mlp-ui-hover: var(--vscode-toolbar-hoverBackground, color-mix(in srgb, var(--mlp-ui-ink) 9%, transparent));
@@ -25,8 +25,8 @@
 	--mlp-ui-input: color-mix(in srgb, var(--vscode-input-background, var(--mlp-ui-base)) 32%, transparent);
 	--mlp-ui-input-shine: color-mix(in srgb, var(--mlp-ui-light) 10%, transparent);
 	--mlp-ui-input-rim: color-mix(in srgb, var(--mlp-ui-light) 22%, transparent);
-	--mlp-ui-input-glass: linear-gradient(155deg, var(--mlp-ui-input-shine), transparent 35%, transparent 70%, var(--mlp-ui-glint)), var(--mlp-ui-input);
-	--mlp-ui-input-shadow: inset 0 1px 0 var(--mlp-ui-input-rim), inset 0 -1px 0 var(--mlp-ui-glint), inset 0 0 0 1px var(--mlp-ui-glint);
+	--mlp-ui-input-glass: var(--mlp-ui-input);
+	--mlp-ui-input-shadow: inset 0 0 0 1px var(--mlp-ui-glint);
 	--mlp-ui-line: color-mix(in srgb, var(--mlp-ui-ink) 12%, transparent);
 }
 

@@ -11,6 +11,7 @@ const PATHS = {
 	reset: '<path d="M3.5 5.5a5 5 0 1 1-.3 4M2.5 2.5v4h4"/>',
 	previous: '<path d="m10 3-5 5 5 5"/>',
 	next: '<path d="m6 3 5 5-5 5"/>',
+	headingFold: '<path d="m4 3 8 5-8 5"/>',
 } as const;
 
 export type ControlIcon = keyof typeof PATHS;

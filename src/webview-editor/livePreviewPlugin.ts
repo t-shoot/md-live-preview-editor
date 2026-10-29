@@ -451,6 +451,11 @@ interface CellRef {
 	source: string;
 }
 
+type TableCellCaret = 'all' | 'end';
+// A commit can replace the entire table. Editing must then belong to the
+// mounted widget, including its key and focusout handlers, not the old one.
+const tableCellEditors = new WeakMap<HTMLElement, (cell: HTMLElement, caret: TableCellCaret) => void>();
+
 function readCellRef(cell: HTMLElement): CellRef | null {
 	const { mlpRow, mlpCol, mlpFrom, mlpTo, mlpSrc } = cell.dataset;
 	if (mlpRow === undefined || mlpCol === undefined || mlpFrom === undefined || mlpTo === undefined) return null;
@@ -726,7 +731,7 @@ class TableWidget extends WidgetType {
 		};
 
 		/** Swaps a cell to its raw Markdown and puts the caret in it. */
-		const beginEditing = (cell: HTMLElement, caret: 'all' | 'end'): void => {
+		const beginEditing = (cell: HTMLElement, caret: TableCellCaret): void => {
 			if (editing === cell) return;
 			if (editing) commit(editing);
 			const ref = readCellRef(cell);
@@ -765,9 +770,26 @@ class TableWidget extends WidgetType {
 			selection.removeAllRanges();
 			selection.addRange(range);
 		};
+		tableCellEditors.set(table, beginEditing);
 
 		const cellAt = (row: number, col: number): HTMLElement | null =>
 			table.querySelector('[data-mlp-row="' + row + '"][data-mlp-col="' + col + '"]');
+
+		const focusCell = (row: number, col: number, caret: TableCellCaret): void => {
+			if (editing === cellAt(row, col)) return;
+			const needsCommit = editing !== null;
+			if (editing) commit(editing);
+			const finish = (): void => {
+				const scope = view.dom.querySelector<HTMLElement>(`.mlp-table-wrap[data-mlp-table-from="${this.tableFrom}"]`);
+				const liveTable = scope?.querySelector<HTMLElement>('table.mlp-table');
+				const cell = liveTable?.querySelector<HTMLElement>(`.mlp-table-cell[data-mlp-row="${row}"][data-mlp-col="${col}"]`);
+				if (liveTable && cell) tableCellEditors.get(liveTable)?.(cell, caret);
+			};
+			// Wait for the replacement widget after a commit. Reacquire both the
+			// cell and its editor so the following click also sees the active edit.
+			if (needsCommit && typeof requestAnimationFrame === 'function') requestAnimationFrame(finish);
+			else finish();
+		};
 
 		/** Moves editing `delta` cells along in reading order. */
 		const moveFocus = (ref: CellRef, delta: number): boolean => {
@@ -779,30 +801,9 @@ class TableWidget extends WidgetType {
 			const col = index % width;
 			if (!cellAt(row, col)) return false;
 
-			// Saving the cell being left rewrites the document, and CodeMirror
-			// answers that by rebuilding this widget — every cell element, including
-			// the one Tab is moving to, is replaced. Holding a reference across the
-			// commit therefore landed the edit on a node no longer in the document:
-			// the caret went nowhere and whatever was typed next was lost. The
-			// destination is identified by its grid position instead, and looked up
-			// again afterwards, in the table that is on screen by then.
-			if (editing) commit(editing);
-			const finish = (): void => {
-				// The document position at a block boundary can resolve to the
-				// surrounding content instead of the widget. Identify the replacement
-				// explicitly; a document-wide fallback would target the first table.
-				const scope = view.dom.querySelector<HTMLElement>(`.mlp-table-wrap[data-mlp-table-from="${this.tableFrom}"]`);
-				const live = scope?.querySelector<HTMLElement>(
-					`.mlp-table-cell[data-mlp-row="${row}"][data-mlp-col="${col}"]`,
-				);
-				// Tab selects the whole cell it lands on, the way a spreadsheet does,
-				// so typing straight away replaces the old value.
-				if (live) beginEditing(live, 'all');
-			};
-			// The rebuild lands in a measure/update cycle, so the new element does not
-			// exist yet; `requestAnimationFrame` runs after it has been mounted.
-			if (typeof requestAnimationFrame === 'function') requestAnimationFrame(finish);
-			else finish();
+			// Keyboard navigation selects the whole cell; a click places the caret
+			// at the end. Both use the same handoff to the current widget.
+			focusCell(row, col, 'all');
 			return true;
 		};
 
@@ -896,10 +897,11 @@ class TableWidget extends WidgetType {
 			if (Math.hypot(event.clientX - pressX, event.clientY - pressY) > DRAG_SLOP_PX) return;
 			// A single press that nonetheless left text selected is the tail of a
 			// drag that ended near its start; also a copy gesture.
-			if (event.detail <= 1 && hasTextSelectionWithin(table)) return;
+			if (!editing && event.detail <= 1 && hasTextSelectionWithin(table)) return;
 			event.preventDefault();
 			if (event.detail > 1) window.getSelection?.()?.removeAllRanges();
-			beginEditing(cell, 'end');
+			const ref = readCellRef(cell);
+			if (ref) focusCell(ref.row, ref.col, 'end');
 		});
 
 		// The click that follows a handled press has nothing left to do, but it must

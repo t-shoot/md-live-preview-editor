@@ -37,14 +37,15 @@ html, body {
 	line-height: 1.7;
 }
 
-/* A centered reading column; gutters shrink in narrow split editors. */
+/* Fill the editor with responsive gutters: up to 120px on wide screens,
+   three times the former 40px gutter, and down to 16px in narrow splits. */
 .cm-editor .cm-content {
 	font-family: "Yu Gothic UI", Meiryo, "Hiragino Sans", "Noto Sans JP", system-ui, sans-serif;
 	box-sizing: border-box;
 	width: 100%;
-	max-width: calc(1000px + 2 * clamp(1rem, 3.5vw, 2.5rem));
+	max-width: none;
 	margin-inline: auto;
-	padding: 1.5rem clamp(1rem, 3.5vw, 2.5rem) 40vh;
+	padding: 1.5rem clamp(1rem, 6.25vw, 7.5rem) 40vh;
 	/* Prefer the theme's dedicated cursor color; fall back to the editor's own
 	   foreground (guaranteed to contrast with --vscode-editor-background,
 	   unlike a hardcoded gray which can vanish against a light theme) rather
@@ -138,6 +139,64 @@ html, body {
 .cm-line.mlp-line-h5 { font-size: 1.05em; }
 .cm-line.mlp-line-h6 { font-size: 1em; opacity: 0.85; }
 
+.mlp-heading-fold-host {
+	display: inline-block;
+	position: relative;
+	width: 0;
+	height: 1em;
+	vertical-align: -0.1em;
+}
+.mlp-heading-fold-toggle {
+	position: absolute;
+	right: 2px;
+	top: 50%;
+	transform: translateY(-50%);
+	width: 18px;
+	height: 18px;
+	padding: 0;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	opacity: 0;
+}
+.mlp-heading-fold-chevron {
+	display: block;
+	width: 12px;
+	height: 12px;
+	stroke-width: 2;
+	flex: none;
+}
+.cm-line:hover .mlp-heading-fold-toggle {
+	opacity: 0.8;
+}
+.mlp-heading-fold-toggle[aria-expanded="true"] .mlp-heading-fold-chevron {
+	transform: rotate(90deg);
+}
+.mlp-heading-fold-toggle,
+.mlp-heading-fold-placeholder {
+	border: 0;
+	border-radius: 3px;
+	background: transparent;
+	color: var(--vscode-editor-foreground);
+	cursor: pointer;
+}
+.mlp-heading-fold-placeholder {
+	margin-inline-start: 0.3em;
+	padding: 0 0.25em;
+	font: inherit;
+	line-height: 1;
+}
+.mlp-heading-fold-toggle:hover,
+.mlp-heading-fold-toggle:focus-visible,
+.mlp-heading-fold-placeholder:hover {
+	background: var(--mlp-ui-hover);
+	opacity: 1;
+}
+.mlp-heading-fold-toggle:focus-visible,
+.mlp-heading-fold-placeholder:focus-visible {
+	outline: 1px solid var(--vscode-focusBorder);
+}
+
 /* ── Inline emphasis ─────────────────────────────────────────────────────── */
 .mlp-strong { font-weight: 700; }
 .mlp-em { font-style: italic; }
@@ -167,6 +226,50 @@ html, body {
 	   the first content line's right edge. */
 	position: relative;
 }
+/* Markdown themes apply pre's overflow to every editor line. The block-wide
+   scrollbar below owns horizontal scrolling instead; rows never draw a bar. */
+.cm-line.mlp-line-code:not(.mlp-code-toolbar-line) {
+	white-space: pre !important;
+	overflow: hidden !important;
+}
+.mlp-code-scrollable-row::after {
+	content: '';
+	position: absolute;
+	left: calc(var(--mlp-code-scroll-width) - 1px);
+	top: 0;
+	width: 1px;
+	height: 1px;
+	pointer-events: none;
+}
+.cm-line.mlp-code-scrollable-row.mlp-line-code-last {
+	border-bottom-left-radius: 0 !important;
+	border-bottom-right-radius: 0 !important;
+}
+.mlp-code-fence-hidden:has(+ .mlp-code-scrollbar[data-overflow="true"]) {
+	height: 0;
+	line-height: 0;
+	overflow: clip;
+}
+.mlp-code-scrollbar {
+	display: none;
+	overflow-x: scroll;
+	overflow-y: hidden;
+	height: 14px;
+	background: var(--vscode-textCodeBlock-background, rgba(127, 127, 127, 0.09));
+	border-radius: 0 0 var(--mlp-ui-block-radius) var(--mlp-ui-block-radius);
+}
+.mlp-code-scrollbar::-webkit-scrollbar { height: 10px; }
+.mlp-code-scrollbar::-webkit-scrollbar-thumb {
+	background: var(--vscode-scrollbarSlider-background, rgba(127, 127, 127, 0.4));
+	border: 2px solid transparent;
+	border-radius: 6px;
+	background-clip: padding-box;
+}
+.mlp-code-scrollbar::-webkit-scrollbar-thumb:hover {
+	background-color: var(--vscode-scrollbarSlider-hoverBackground, rgba(127, 127, 127, 0.6));
+}
+.mlp-code-scrollbar[data-overflow="true"] { display: block; }
+.mlp-code-scrollbar-width { height: 1px; }
 /* Diff fences color the supplied lines; no comparison is performed. */
 .cm-line.mlp-line-code.mlp-diff-added {
 	color: var(--vscode-gitDecoration-addedResourceForeground, #22863a);
@@ -410,6 +513,11 @@ html, body {
 .mlp-block {
 	padding: 0.5em 0;
 }
+/* Tables already have a source-control strip above them. Avoid stacking the
+   general block padding on top of that strip and the Markdown's blank line. */
+.mlp-block:has(> .mlp-table-wrap) {
+	padding-top: 0;
+}
 
 /* ── Tables ──────────────────────────────────────────────────────────────── */
 .mlp-table-raw {
@@ -510,11 +618,22 @@ html, body {
 /* Strip above the table holding its controls. Right-aligned so the button lines
    up with the table's own right edge rather than floating loose. */
 .mlp-table-toolbar {
+	position: relative;
 	display: flex;
 	justify-content: flex-end;
 	align-items: center;
 	gap: 4px;
-	padding-bottom: 3px;
+	height: 21px;
+}
+/* Reuse part of an existing blank line, while leaving enough room when a
+   table follows text directly. The full button target stays above the cells. */
+.cm-line:has(> br:only-child) + .mlp-block .mlp-table-toolbar {
+	height: 16px;
+}
+.mlp-table-toolbar > .mlp-code-mode-btn {
+	position: absolute;
+	right: 0;
+	bottom: 1px;
 }
 /* Positioned box that puts a code-mode button in a block's top-right corner
    (see withCodeModeButton in codeModeButton.ts). Used by the blocks that have
@@ -724,6 +843,11 @@ table.mlp-table th.mlp-table-cell-editing, table.mlp-table td.mlp-table-cell-edi
 table.mlp-table th {
 	background: rgba(127, 127, 127, 0.12);
 	font-weight: 600;
+}
+/* Keep header rules aligned with the body and frame, even when a Markdown
+   theme brightens them with a selector such as `body.vscode-dark th`. */
+table.mlp-table th.mlp-table-cell {
+	border-color: rgba(127, 127, 127, 0.35);
 }
 /* An image inside a cell sits on the text baseline of a single line, so the
    vertical margin `.mlp-image` carries for a standalone block image would just

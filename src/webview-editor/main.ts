@@ -18,6 +18,9 @@ import { blockDecorationsField } from './blockDecorations';
 import { detectFrontmatter } from './frontmatterWidget';
 import { headingSpaceInputHandler } from './headingSpacePlugin';
 import { backtickInputHandler } from './backtickPairPlugin';
+import { headingFoldExtension } from './headingFold';
+import { backspaceBelowTable } from './tableBoundary';
+import { codeScrollExtension } from './codeScroll';
 import { toggleEmphasisCommand } from './emphasisShortcuts';
 import { createImagePasteHandler } from './imagePasteHandler';
 import { postToHost, onHostMessage } from './vscodeApi';
@@ -89,8 +92,10 @@ function createExtensions(): Extension[] {
 		closeBrackets(),
 		headingSpaceInputHandler,
 		backtickInputHandler,
+		headingFoldExtension,
 		livePreviewPlugin,
 		blockDecorationsField,
+		codeScrollExtension,
 		codeHighlightExtension,
 		createLinkClickHandler((href) => postToHost({ type: 'openLink', href })),
 		createImagePasteHandler((atPos, mimeType, dataBase64, needsOwnParagraph) =>
@@ -129,6 +134,7 @@ function createExtensions(): Extension[] {
 			'on line': t('search.onLine'),
 		}),
 		keymap.of([
+			{ key: 'Backspace', run: backspaceBelowTable },
 			...closeBracketsKeymap,
 			// Bound ahead of the defaults below so Mod-f reaches the panel rather
 			// than any other handler, and so each jump can mark its selection as a

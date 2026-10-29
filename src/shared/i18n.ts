@@ -13,10 +13,13 @@
 
 /** Every user-visible webview string, keyed by a stable identifier. */
 const en = {
+	'heading.fold': 'Collapse section: {0}',
+	'heading.unfold': 'Expand section: {0}',
 	'code.toggle.title': 'Code mode: show the Markdown source and edit it directly',
 	'code.toggle.aria': 'Switch to code mode',
 	'code.copy.title': 'Copy this code block',
 	'code.copy.aria': 'Copy code block',
+	'code.scroll': 'Scroll code horizontally',
 
 	'zoom.in': 'Zoom in (Ctrl+wheel also works)',
 	'zoom.out': 'Zoom out',
@@ -38,7 +41,7 @@ const en = {
 	'drawio.noConnection': 'The connection to the host is not established yet.',
 
 	'frontmatter.parseFailed': 'Could not parse the front matter',
-	'frontmatter.summary': 'Document information',
+	'frontmatter.summary': 'Front matter',
 
 	'table.addRow': 'Add a row',
 	'table.addColumn': 'Add a column',
@@ -149,7 +152,10 @@ const ja: Record<MessageKey, string> = {
 	'drawio.noConnection': 'ホストへの接続がまだ確立していません。',
 
 	'frontmatter.parseFailed': 'フロントマターの解析に失敗しました',
-	'frontmatter.summary': '文書情報',
+	'frontmatter.summary': 'フロントマター',
+	'code.scroll': 'コードを横にスクロール',
+	'heading.fold': '項目をたたむ: {0}',
+	'heading.unfold': '項目を開く: {0}',
 
 	'table.addRow': '行を追加',
 	'table.addColumn': '列を追加',

@@ -14,7 +14,9 @@ for (const width of [1920, 1200, 360]) {
 		expect(metrics.font).toContain('Yu Gothic UI');
 		expect(metrics.right).toBeLessThanOrEqual(metrics.viewport + 1);
 		expect(metrics.left).toBeGreaterThanOrEqual(0);
-		if (width >= 1200) expect(metrics.contentWidth).toBeCloseTo(1000, 0);
+		const gutter = Math.min(120, Math.max(16, width * 0.0625));
+		expect(metrics.width - metrics.contentWidth).toBeCloseTo(2 * gutter, 0);
+		if (width >= 1200) expect(metrics.width).toBeGreaterThan(width - 20);
 		expect(Math.abs((metrics.left + metrics.right) / 2 - metrics.viewport / 2)).toBeLessThanOrEqual(10);
 		expect(metrics.pageWidth).toBeLessThanOrEqual(metrics.viewport);
 		const cell = page.locator('[data-mlp-row="1"][data-mlp-col="0"]');
